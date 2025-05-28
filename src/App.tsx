@@ -58,6 +58,8 @@ function Scene({ modelUrl, settings }: { modelUrl: string | null, settings: Orbi
 function App() {
   const [modelUrl, setModelUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [jsonInput, setJsonInput] = useState<string>('')
+  const [jsonError, setJsonError] = useState<string>('')
   const [settings, setSettings] = useState<OrbitControlsSettings>({
     minDistance: 1,
     maxDistance: 100,
@@ -96,6 +98,45 @@ function App() {
 
   const updateSetting = (key: keyof OrbitControlsSettings, value: number | boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleJsonInput = (value: string) => {
+    setJsonInput(value)
+    setJsonError('')
+  }
+
+  const applyJsonSettings = () => {
+    try {
+      const parsed = JSON.parse(jsonInput)
+      
+      // Validate that all required keys are present and have correct types
+      const validSettings: OrbitControlsSettings = {
+        minDistance: typeof parsed.minDistance === 'number' ? parsed.minDistance : settings.minDistance,
+        maxDistance: typeof parsed.maxDistance === 'number' ? parsed.maxDistance : settings.maxDistance,
+        minPolarAngle: typeof parsed.minPolarAngle === 'number' ? parsed.minPolarAngle : settings.minPolarAngle,
+        maxPolarAngle: typeof parsed.maxPolarAngle === 'number' ? parsed.maxPolarAngle : settings.maxPolarAngle,
+        minAzimuthAngle: typeof parsed.minAzimuthAngle === 'number' ? parsed.minAzimuthAngle : settings.minAzimuthAngle,
+        maxAzimuthAngle: typeof parsed.maxAzimuthAngle === 'number' ? parsed.maxAzimuthAngle : settings.maxAzimuthAngle,
+        enableDamping: typeof parsed.enableDamping === 'boolean' ? parsed.enableDamping : settings.enableDamping,
+        dampingFactor: typeof parsed.dampingFactor === 'number' ? parsed.dampingFactor : settings.dampingFactor,
+        autoRotate: typeof parsed.autoRotate === 'boolean' ? parsed.autoRotate : settings.autoRotate,
+        autoRotateSpeed: typeof parsed.autoRotateSpeed === 'number' ? parsed.autoRotateSpeed : settings.autoRotateSpeed,
+      }
+      
+      setSettings(validSettings)
+      setJsonError('Settings applied successfully!')
+      setTimeout(() => setJsonError(''), 3000)
+    } catch (error) {
+      setJsonError('Invalid JSON format. Please check your input.')
+    }
+  }
+
+  const copyCurrentSettings = () => {
+    const jsonString = JSON.stringify(settings, null, 2)
+    setJsonInput(jsonString)
+    navigator.clipboard.writeText(jsonString)
+    setJsonError('Settings copied to clipboard!')
+    setTimeout(() => setJsonError(''), 3000)
   }
 
   return (
@@ -261,6 +302,30 @@ function App() {
         <div className="values-display">
           <h3>Current Values:</h3>
           <pre>{JSON.stringify(settings, null, 2)}</pre>
+          <button onClick={copyCurrentSettings} className="copy-button">
+            Copy Current Settings
+          </button>
+        </div>
+
+        <div className="json-input-section">
+          <h3>Import JSON Settings:</h3>
+          <textarea
+            className="json-textarea"
+            value={jsonInput}
+            onChange={(e) => handleJsonInput(e.target.value)}
+            placeholder="Paste your OrbitControls JSON configuration here..."
+            rows={10}
+          />
+          <div className="json-controls">
+            <button onClick={applyJsonSettings} className="apply-button">
+              Apply Settings
+            </button>
+            {jsonError && (
+              <div className={`json-message ${jsonError.includes('success') ? 'success' : 'error'}`}>
+                {jsonError}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
