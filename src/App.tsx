@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Center, Grid, Environment } from '@react-three/drei'
-import { Object3D } from 'three'
 import './App.css'
 
 interface OrbitControlsSettings {
