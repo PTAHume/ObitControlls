@@ -1,13 +1,19 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Center, Grid, Environment } from '@react-three/drei'
-import { Object3D, ObjectLoader, Camera, PerspectiveCamera, Vector3 } from 'three'
+import { Object3D, ObjectLoader, Camera, PerspectiveCamera } from 'three'
 import './App.css'
 
 interface ModelControlsSettings {
   rotationX: number
   rotationY: number
   scale: number
+  minRotationX: number
+  maxRotationX: number
+  minRotationY: number
+  maxRotationY: number
+  minScale: number
+  maxScale: number
   enableDamping: boolean
   dampingFactor: number
   autoRotate: boolean
@@ -52,23 +58,33 @@ function Scene({ sceneData, settings, onControlsUpdate }: {
   }, [sceneData?.activeCamera, camera])
 
   // Apply model transformations
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     if (modelGroupRef.current) {
       // Handle auto rotation
       if (settings.autoRotate) {
         currentRotationY.current += delta * settings.autoRotateSpeed * 0.5
+        // Don't apply Y constraints during auto-rotate for continuous rotation
       }
 
       // Apply damping or direct values
       if (settings.enableDamping) {
         currentRotationX.current += (settings.rotationX - currentRotationX.current) * settings.dampingFactor
-        currentRotationY.current += (settings.rotationY - currentRotationY.current) * settings.dampingFactor
+        if (!settings.autoRotate) {
+          currentRotationY.current += (settings.rotationY - currentRotationY.current) * settings.dampingFactor
+        }
         currentScale.current += (settings.scale - currentScale.current) * settings.dampingFactor
       } else {
         currentRotationX.current = settings.rotationX
         currentRotationY.current = settings.autoRotate ? currentRotationY.current : settings.rotationY
         currentScale.current = settings.scale
       }
+
+      // Apply constraints (skip Y constraints if auto-rotating)
+      currentRotationX.current = Math.max(settings.minRotationX, Math.min(settings.maxRotationX, currentRotationX.current))
+      if (!settings.autoRotate) {
+        currentRotationY.current = Math.max(settings.minRotationY, Math.min(settings.maxRotationY, currentRotationY.current))
+      }
+      currentScale.current = Math.max(settings.minScale, Math.min(settings.maxScale, currentScale.current))
 
       // Apply transformations
       modelGroupRef.current.rotation.x = currentRotationX.current
@@ -112,6 +128,12 @@ function App() {
     rotationX: 0,
     rotationY: 0,
     scale: 1,
+    minRotationX: -Math.PI,
+    maxRotationX: Math.PI,
+    minRotationY: -Infinity,
+    maxRotationY: Infinity,
+    minScale: 0.1,
+    maxScale: 5,
     enableDamping: true,
     dampingFactor: 0.05,
     autoRotate: false,
@@ -213,6 +235,12 @@ function App() {
         rotationX: typeof parsed.rotationX === 'number' ? parsed.rotationX : settings.rotationX,
         rotationY: typeof parsed.rotationY === 'number' ? parsed.rotationY : settings.rotationY,
         scale: typeof parsed.scale === 'number' ? parsed.scale : settings.scale,
+        minRotationX: typeof parsed.minRotationX === 'number' ? parsed.minRotationX : settings.minRotationX,
+        maxRotationX: typeof parsed.maxRotationX === 'number' ? parsed.maxRotationX : settings.maxRotationX,
+        minRotationY: typeof parsed.minRotationY === 'number' ? parsed.minRotationY : settings.minRotationY,
+        maxRotationY: typeof parsed.maxRotationY === 'number' ? parsed.maxRotationY : settings.maxRotationY,
+        minScale: typeof parsed.minScale === 'number' ? parsed.minScale : settings.minScale,
+        maxScale: typeof parsed.maxScale === 'number' ? parsed.maxScale : settings.maxScale,
         enableDamping: typeof parsed.enableDamping === 'boolean' ? parsed.enableDamping : settings.enableDamping,
         dampingFactor: typeof parsed.dampingFactor === 'number' ? parsed.dampingFactor : settings.dampingFactor,
         autoRotate: typeof parsed.autoRotate === 'boolean' ? parsed.autoRotate : settings.autoRotate,
@@ -240,6 +268,12 @@ function App() {
       rotationX: 0,
       rotationY: 0,
       scale: 1,
+      minRotationX: -Math.PI,
+      maxRotationX: Math.PI,
+      minRotationY: -Infinity,
+      maxRotationY: Infinity,
+      minScale: 0.1,
+      maxScale: 5,
       enableDamping: true,
       dampingFactor: 0.05,
       autoRotate: false,
@@ -312,13 +346,69 @@ function App() {
           </div>
         )}
 
-        <div className="control-group">
+        <details className="orbit-controls-mapping">
+          <summary style={{ cursor: 'pointer', padding: '0.75rem', backgroundColor: '#1a1a1a', borderRadius: '8px', marginBottom: '1rem' }}>
+            <strong style={{ color: '#4a9eff' }}>📚 OrbitControls → Model Controls Mapping</strong>
+          </summary>
+          <div style={{ backgroundColor: '#1a1a1a', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
+            <p style={{ marginBottom: '1rem' }}>
+              This tool achieves the same visual results as OrbitControls but by manipulating the model instead of the camera:
+            </p>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #444' }}>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', color: '#4a9eff' }}>OrbitControls</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem', color: '#4a9eff' }}>Model Controls</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <td style={{ padding: '0.5rem' }}>minPolarAngle / maxPolarAngle</td>
+                  <td style={{ padding: '0.5rem' }}>minRotationX / maxRotationX</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <td style={{ padding: '0.5rem' }}>minAzimuthAngle / maxAzimuthAngle</td>
+                  <td style={{ padding: '0.5rem' }}>minRotationY / maxRotationY</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <td style={{ padding: '0.5rem' }}>minDistance / maxDistance</td>
+                  <td style={{ padding: '0.5rem' }}>maxScale / minScale (inverted)</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <td style={{ padding: '0.5rem' }}>enableDamping / dampingFactor</td>
+                  <td style={{ padding: '0.5rem' }}>enableDamping / dampingFactor</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <td style={{ padding: '0.5rem' }}>autoRotate / autoRotateSpeed</td>
+                  <td style={{ padding: '0.5rem' }}>autoRotate / autoRotateSpeed</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <td style={{ padding: '0.5rem' }}>enableZoom</td>
+                  <td style={{ padding: '0.5rem' }}>Scale constraints</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #333' }}>
+                  <td style={{ padding: '0.5rem' }}>enableRotate</td>
+                  <td style={{ padding: '0.5rem' }}>Rotation constraints</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '0.5rem' }}>enablePan</td>
+                  <td style={{ padding: '0.5rem' }}>Not needed (camera fixed)</td>
+                </tr>
+              </tbody>
+            </table>
+            <p style={{ marginTop: '1rem', marginBottom: '0', fontStyle: 'italic', color: '#888' }}>
+              💡 Tip: Scale is inverted - smaller scale = camera farther away, larger scale = camera closer
+            </p>
+          </div>
+        </details>
+
+        <div className="control-group main">
           <label>
             Rotation X: {(settings.rotationX * 180 / Math.PI).toFixed(1)}°
             <input
               type="range"
-              min={-Math.PI}
-              max={Math.PI}
+              min={settings.minRotationX}
+              max={settings.maxRotationX}
               step="0.01"
               value={settings.rotationX}
               onChange={(e) => updateSetting('rotationX', parseFloat(e.target.value))}
@@ -329,13 +419,48 @@ function App() {
           </div>
         </div>
 
-        <div className="control-group">
+        <div className="constraint-group">
+          <h4>X Rotation Constraints</h4>
+          <div className="control-help" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}>
+            Similar to OrbitControls' minPolarAngle/maxPolarAngle but for model rotation.
+            In OrbitControls: camera orbits vertically. Here: model rotates up/down.
+          </div>
+          <div className="control-group constraint">
+            <label>
+              Min Rotation X: {(settings.minRotationX * 180 / Math.PI).toFixed(1)}°
+              <input
+                type="range"
+                min={-Math.PI}
+                max={0}
+                step="0.01"
+                value={settings.minRotationX}
+                onChange={(e) => updateSetting('minRotationX', parseFloat(e.target.value))}
+              />
+            </label>
+          </div>
+
+          <div className="control-group constraint">
+            <label>
+              Max Rotation X: {(settings.maxRotationX * 180 / Math.PI).toFixed(1)}°
+              <input
+                type="range"
+                min={0}
+                max={Math.PI}
+                step="0.01"
+                value={settings.maxRotationX}
+                onChange={(e) => updateSetting('maxRotationX', parseFloat(e.target.value))}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="control-group main">
           <label>
             Rotation Y: {(settings.rotationY * 180 / Math.PI).toFixed(1)}°
             <input
               type="range"
-              min={-Math.PI}
-              max={Math.PI}
+              min={settings.minRotationY === -Infinity ? -Math.PI : settings.minRotationY}
+              max={settings.maxRotationY === Infinity ? Math.PI : settings.maxRotationY}
               step="0.01"
               value={settings.rotationY}
               onChange={(e) => updateSetting('rotationY', parseFloat(e.target.value))}
@@ -347,13 +472,49 @@ function App() {
           </div>
         </div>
 
-        <div className="control-group">
+        <div className="constraint-group">
+          <h4>Y Rotation Constraints</h4>
+          <div className="control-help" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}>
+            Similar to OrbitControls' minAzimuthAngle/maxAzimuthAngle but for model rotation.
+            In OrbitControls: camera orbits horizontally. Here: model rotates left/right.
+            Note: Constraints don't apply during auto-rotate for continuous spin.
+          </div>
+          <div className="control-group constraint">
+            <label>
+              Min Rotation Y: {settings.minRotationY === -Infinity ? '-∞' : (settings.minRotationY * 180 / Math.PI).toFixed(1) + '°'}
+              <input
+                type="range"
+                min={-Math.PI}
+                max={Math.PI}
+                step="0.01"
+                value={settings.minRotationY === -Infinity ? -Math.PI : settings.minRotationY}
+                onChange={(e) => updateSetting('minRotationY', parseFloat(e.target.value))}
+              />
+            </label>
+          </div>
+
+          <div className="control-group constraint">
+            <label>
+              Max Rotation Y: {settings.maxRotationY === Infinity ? '∞' : (settings.maxRotationY * 180 / Math.PI).toFixed(1) + '°'}
+              <input
+                type="range"
+                min={-Math.PI}
+                max={Math.PI}
+                step="0.01"
+                value={settings.maxRotationY === Infinity ? Math.PI : settings.maxRotationY}
+                onChange={(e) => updateSetting('maxRotationY', parseFloat(e.target.value))}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="control-group main">
           <label>
             Scale: {settings.scale.toFixed(2)}
             <input
               type="range"
-              min="0.1"
-              max="5"
+              min={settings.minScale}
+              max={settings.maxScale}
               step="0.01"
               value={settings.scale}
               onChange={(e) => updateSetting('scale', parseFloat(e.target.value))}
@@ -361,6 +522,42 @@ function App() {
           </label>
           <div className="control-help">
             Adjusts the size of the model
+          </div>
+        </div>
+
+        <div className="constraint-group">
+          <h4>Scale Constraints</h4>
+          <div className="control-help" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}>
+            Similar to OrbitControls' minDistance/maxDistance but inverted for model scale.
+            In OrbitControls: camera zoom limits. Here: model size limits.
+            Small scale = zoomed out view, Large scale = zoomed in view.
+          </div>
+          <div className="control-group constraint">
+            <label>
+              Min Scale: {settings.minScale.toFixed(2)}
+              <input
+                type="range"
+                min="0.1"
+                max="2"
+                step="0.01"
+                value={settings.minScale}
+                onChange={(e) => updateSetting('minScale', parseFloat(e.target.value))}
+              />
+            </label>
+          </div>
+
+          <div className="control-group constraint">
+            <label>
+              Max Scale: {settings.maxScale.toFixed(2)}
+              <input
+                type="range"
+                min="1"
+                max="10"
+                step="0.1"
+                value={settings.maxScale}
+                onChange={(e) => updateSetting('maxScale', parseFloat(e.target.value))}
+              />
+            </label>
           </div>
         </div>
 

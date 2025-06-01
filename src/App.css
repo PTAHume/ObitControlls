@@ -63,7 +63,7 @@
 }
 
 .controls-panel {
-  width: 400px;
+  width: 450px;
   background-color: #2a2a2a;
   padding: 2rem;
   overflow-y: auto;
@@ -129,6 +129,18 @@
 
 .control-group {
   margin-bottom: 1.5rem;
+}
+
+.control-group.constraint {
+  background-color: #1a1a1a;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  border: 1px solid #333;
+}
+
+.control-group.main {
+  margin-bottom: 0.5rem;
 }
 
 .control-group label {
@@ -197,6 +209,22 @@
   color: #888;
   margin-top: 0.25rem;
   font-style: italic;
+}
+
+.constraint-group {
+  background-color: #1a1a1a;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #333;
+}
+
+.constraint-group h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: #4a9eff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .values-display {
