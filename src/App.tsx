@@ -1,16 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Center, Grid, Environment } from '@react-three/drei'
-import { Object3D, ObjectLoader, Camera, PerspectiveCamera } from 'three'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Center, Grid, Environment } from '@react-three/drei'
+import { Object3D, ObjectLoader, Camera, PerspectiveCamera, Vector3 } from 'three'
 import './App.css'
 
-interface OrbitControlsSettings {
-  minDistance: number
-  maxDistance: number
-  minPolarAngle: number
-  maxPolarAngle: number
-  minAzimuthAngle: number
-  maxAzimuthAngle: number
+interface ModelControlsSettings {
+  rotationX: number
+  rotationY: number
+  scale: number
   enableDamping: boolean
   dampingFactor: number
   autoRotate: boolean
@@ -23,45 +20,65 @@ interface SceneData {
   activeCamera: Camera
 }
 
-function Model({ url, sceneData }: { url: string | null, sceneData: SceneData | null }) {
+function SceneModel({ sceneData }: { sceneData: SceneData | null }) {
   if (sceneData) {
     return <primitive object={sceneData.scene} />
   }
-  
-  if (url) {
-    const { scene } = useGLTF(url)
-    return <primitive object={scene} />
-  }
-  
   return null
 }
 
-function Scene({ modelUrl, sceneData, settings }: { 
-  modelUrl: string | null, 
+function Scene({ sceneData, settings, onControlsUpdate }: {
   sceneData: SceneData | null,
-  settings: OrbitControlsSettings 
+  settings: ModelControlsSettings,
+  onControlsUpdate: (rotationX: number, rotationY: number, scale: number) => void
 }) {
-  const controlsRef = useRef<any>(null)
-  const modelGroupRef = useRef<Object3D>(null)
+  const modelGroupRef = useRef<any>(null)
+  const { camera } = useThree()
+  const currentRotationX = useRef(0)
+  const currentRotationY = useRef(0)
+  const currentScale = useRef(1)
 
-  // Update OrbitControls when camera changes
+  // Set camera when scene data changes
   useEffect(() => {
-    if (controlsRef.current && sceneData?.activeCamera) {
-      const camera = sceneData.activeCamera
-      
-      // Reset controls
-      controlsRef.current.reset()
-      
-      // Set camera position
-      controlsRef.current.object.position.copy(camera.position)
-      
-      // Set target to look at center
-      controlsRef.current.target.set(0, 0, 0)
-      
-      // Update controls
-      controlsRef.current.update()
+    if (sceneData?.activeCamera) {
+      const activeCamera = sceneData.activeCamera
+      camera.position.copy(activeCamera.position)
+      camera.rotation.copy(activeCamera.rotation)
+      if (activeCamera instanceof PerspectiveCamera) {
+        (camera as PerspectiveCamera).fov = activeCamera.fov
+        camera.updateProjectionMatrix()
+      }
     }
-  }, [sceneData?.activeCamera])
+  }, [sceneData?.activeCamera, camera])
+
+  // Apply model transformations
+  useFrame((state, delta) => {
+    if (modelGroupRef.current) {
+      // Handle auto rotation
+      if (settings.autoRotate) {
+        currentRotationY.current += delta * settings.autoRotateSpeed * 0.5
+      }
+
+      // Apply damping or direct values
+      if (settings.enableDamping) {
+        currentRotationX.current += (settings.rotationX - currentRotationX.current) * settings.dampingFactor
+        currentRotationY.current += (settings.rotationY - currentRotationY.current) * settings.dampingFactor
+        currentScale.current += (settings.scale - currentScale.current) * settings.dampingFactor
+      } else {
+        currentRotationX.current = settings.rotationX
+        currentRotationY.current = settings.autoRotate ? currentRotationY.current : settings.rotationY
+        currentScale.current = settings.scale
+      }
+
+      // Apply transformations
+      modelGroupRef.current.rotation.x = currentRotationX.current
+      modelGroupRef.current.rotation.y = currentRotationY.current
+      modelGroupRef.current.scale.setScalar(currentScale.current)
+
+      // Report current values
+      onControlsUpdate(currentRotationX.current, currentRotationY.current, currentScale.current)
+    }
+  })
 
   return (
     <>
@@ -69,52 +86,41 @@ function Scene({ modelUrl, sceneData, settings }: {
       <directionalLight position={[10, 10, 5]} intensity={1} />
       <Grid infiniteGrid fadeDistance={50} fadeStrength={5} />
       <Environment preset="studio" />
-      
+
       <group ref={modelGroupRef}>
-        {(modelUrl || sceneData) && (
+        {sceneData && (
           <Center>
-            <Model url={modelUrl} sceneData={sceneData} />
+            <SceneModel sceneData={sceneData} />
           </Center>
         )}
       </group>
-      
-      <OrbitControls
-        ref={controlsRef}
-        makeDefault
-        minDistance={settings.minDistance}
-        maxDistance={settings.maxDistance}
-        minPolarAngle={settings.minPolarAngle}
-        maxPolarAngle={settings.maxPolarAngle}
-        minAzimuthAngle={settings.minAzimuthAngle}
-        maxAzimuthAngle={settings.maxAzimuthAngle}
-        enableDamping={settings.enableDamping}
-        dampingFactor={settings.dampingFactor}
-        autoRotate={settings.autoRotate}
-        autoRotateSpeed={settings.autoRotateSpeed}
-        enablePan={false}
-      />
     </>
   )
 }
 
 function App() {
-  const [modelUrl, setModelUrl] = useState<string | null>(null)
   const [sceneData, setSceneData] = useState<SceneData | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [jsonInput, setJsonInput] = useState<string>('')
   const [jsonError, setJsonError] = useState<string>('')
-  const [settings, setSettings] = useState<OrbitControlsSettings>({
-    minDistance: 1,
-    maxDistance: 100,
-    minPolarAngle: 0,
-    maxPolarAngle: Math.PI,
-    minAzimuthAngle: -Infinity,
-    maxAzimuthAngle: Infinity,
+  const [currentValues, setCurrentValues] = useState({
+    rotationX: 0,
+    rotationY: 0,
+    scale: 1
+  })
+  const [settings, setSettings] = useState<ModelControlsSettings>({
+    rotationX: 0,
+    rotationY: 0,
+    scale: 1,
     enableDamping: true,
     dampingFactor: 0.05,
     autoRotate: false,
     autoRotateSpeed: 2
   })
+
+  const handleControlsUpdate = useCallback((rotationX: number, rotationY: number, scale: number) => {
+    setCurrentValues({ rotationX, rotationY, scale })
+  }, [])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -140,145 +146,56 @@ function App() {
     setIsDragging(false)
 
     const file = e.dataTransfer.files[0]
-    if (file) {
-      if (file.name.endsWith('.gltf') || file.name.endsWith('.glb')) {
-        const url = URL.createObjectURL(file)
-        setModelUrl(url)
-        setSceneData(null)
-      } else if (file.name.endsWith('.json')) {
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          try {
-            const json = JSON.parse(event.target?.result as string)
-            
-            // Handle Three.js Editor format
-            if (json.metadata && json.metadata.type === "App") {
-              // Find all cameras in the scene
-              const cameras: Camera[] = []
-              let defaultCamera: Camera | undefined
+    if (file && file.name.endsWith('.json')) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        try {
+          const json = JSON.parse(event.target?.result as string)
 
-              // Check for camera in root
-              if (json.camera) {
-                const cam = new PerspectiveCamera(
-                  json.camera.fov || 50,
-                  window.innerWidth / window.innerHeight,
-                  json.camera.near || 0.1,
-                  json.camera.far || 1000
-                )
-                if (json.camera.position) {
-                  cam.position.set(
-                    json.camera.position.x || 0,
-                    json.camera.position.y || 0,
-                    json.camera.position.z || 0
-                  )
-                }
-                if (json.camera.rotation) {
-                  cam.rotation.set(
-                    json.camera.rotation._x || 0,
-                    json.camera.rotation._y || 0,
-                    json.camera.rotation._z || 0
-                  )
-                }
-                cameras.push(cam)
-                defaultCamera = cam
+          const loader = new ObjectLoader()
+          const cameras: Camera[] = []
+          let defaultCamera: Camera | undefined
+
+          // Simple parse - let ObjectLoader handle the format detection
+          loader.parse(json, (object) => {
+            // Find all cameras in the scene
+            object.traverse((child) => {
+              if (child instanceof Camera) {
+                cameras.push(child)
+                if (!defaultCamera) defaultCamera = child
               }
+            })
 
-              // Look for cameras in children
-              if (json.object?.children) {
-                json.object.children.forEach((child: any) => {
-                  if (child.type === "PerspectiveCamera") {
-                    const cam = new PerspectiveCamera(
-                      child.fov || 50,
-                      window.innerWidth / window.innerHeight,
-                      child.near || 0.1,
-                      child.far || 1000
-                    )
-                    if (child.position) {
-                      cam.position.set(
-                        child.position.x || 0,
-                        child.position.y || 0,
-                        child.position.z || 0
-                      )
-                    }
-                    if (child.rotation) {
-                      cam.rotation.set(
-                        child.rotation._x || 0,
-                        child.rotation._y || 0,
-                        child.rotation._z || 0
-                      )
-                    }
-                    cameras.push(cam)
-                    if (!defaultCamera) defaultCamera = cam
-                  }
-                })
-              }
-
-              // If no cameras found, create a default one
-              if (cameras.length === 0) {
-                const defaultCam = new PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000)
-                defaultCam.position.set(5, 5, 5)
-                cameras.push(defaultCam)
-                defaultCamera = defaultCam
-              }
-
-              // Create scene
-              const loader = new ObjectLoader()
-              loader.parse(json.scene || json.object, (object) => {
-                setSceneData({ 
-                  scene: object, 
-                  cameras: cameras,
-                  activeCamera: defaultCamera!
-                })
-                setModelUrl(null)
-                setJsonError('Scene loaded successfully!')
-                setTimeout(() => setJsonError(''), 3000)
-              })
-            } else {
-              // Try loading as regular Three.js scene
-              const loader = new ObjectLoader()
-              loader.parse(json, (object) => {
-                const cameras: Camera[] = []
-                let defaultCamera: Camera | undefined
-
-                object.traverse((child) => {
-                  if (child instanceof Camera) {
-                    cameras.push(child)
-                    if (!defaultCamera) defaultCamera = child
-                  }
-                })
-
-                // If no cameras found, create a default one
-                if (cameras.length === 0) {
-                  const defaultCam = new PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000)
-                  defaultCam.position.set(5, 5, 5)
-                  cameras.push(defaultCam)
-                  defaultCamera = defaultCam
-                }
-
-                setSceneData({ 
-                  scene: object, 
-                  cameras: cameras,
-                  activeCamera: defaultCamera!
-                })
-                setModelUrl(null)
-                setJsonError('Scene loaded successfully!')
-                setTimeout(() => setJsonError(''), 3000)
-              })
+            // If no cameras found, create a default one
+            if (cameras.length === 0) {
+              const defaultCam = new PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000)
+              defaultCam.position.set(5, 5, 5)
+              defaultCam.lookAt(0, 0, 0)
+              cameras.push(defaultCam)
+              defaultCamera = defaultCam
             }
-          } catch (error) {
-            console.error('Scene loading error:', error)
-            setJsonError('Failed to parse scene JSON file. Make sure it\'s exported from Three.js Editor.')
-            setTimeout(() => setJsonError(''), 5000)
-          }
+
+            setSceneData({
+              scene: object,
+              cameras: cameras,
+              activeCamera: defaultCamera!
+            })
+            setJsonError('Scene loaded successfully!')
+            setTimeout(() => setJsonError(''), 3000)
+          })
+        } catch (error: any) {
+          console.error('Scene loading error:', error)
+          setJsonError(`Failed to parse scene JSON: ${error?.message || error}`)
+          setTimeout(() => setJsonError(''), 5000)
         }
-        reader.readAsText(file)
-      } else {
-        alert('Please drop a .gltf, .glb, or .json file')
       }
+      reader.readAsText(file)
+    } else {
+      alert('Please drop a .json scene file')
     }
   }, [])
 
-  const updateSetting = (key: keyof OrbitControlsSettings, value: number | boolean) => {
+  const updateSetting = (key: keyof ModelControlsSettings, value: number | boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
@@ -290,21 +207,18 @@ function App() {
   const applyJsonSettings = () => {
     try {
       const parsed = JSON.parse(jsonInput)
-      
+
       // Validate that all required keys are present and have correct types
-      const validSettings: OrbitControlsSettings = {
-        minDistance: typeof parsed.minDistance === 'number' ? parsed.minDistance : settings.minDistance,
-        maxDistance: typeof parsed.maxDistance === 'number' ? parsed.maxDistance : settings.maxDistance,
-        minPolarAngle: typeof parsed.minPolarAngle === 'number' ? parsed.minPolarAngle : settings.minPolarAngle,
-        maxPolarAngle: typeof parsed.maxPolarAngle === 'number' ? parsed.maxPolarAngle : settings.maxPolarAngle,
-        minAzimuthAngle: typeof parsed.minAzimuthAngle === 'number' ? parsed.minAzimuthAngle : settings.minAzimuthAngle,
-        maxAzimuthAngle: typeof parsed.maxAzimuthAngle === 'number' ? parsed.maxAzimuthAngle : settings.maxAzimuthAngle,
+      const validSettings: ModelControlsSettings = {
+        rotationX: typeof parsed.rotationX === 'number' ? parsed.rotationX : settings.rotationX,
+        rotationY: typeof parsed.rotationY === 'number' ? parsed.rotationY : settings.rotationY,
+        scale: typeof parsed.scale === 'number' ? parsed.scale : settings.scale,
         enableDamping: typeof parsed.enableDamping === 'boolean' ? parsed.enableDamping : settings.enableDamping,
         dampingFactor: typeof parsed.dampingFactor === 'number' ? parsed.dampingFactor : settings.dampingFactor,
         autoRotate: typeof parsed.autoRotate === 'boolean' ? parsed.autoRotate : settings.autoRotate,
         autoRotateSpeed: typeof parsed.autoRotateSpeed === 'number' ? parsed.autoRotateSpeed : settings.autoRotateSpeed,
       }
-      
+
       setSettings(validSettings)
       setJsonError('Settings applied successfully!')
       setTimeout(() => setJsonError(''), 3000)
@@ -321,21 +235,28 @@ function App() {
     setTimeout(() => setJsonError(''), 3000)
   }
 
+  const resetControls = () => {
+    setSettings({
+      rotationX: 0,
+      rotationY: 0,
+      scale: 1,
+      enableDamping: true,
+      dampingFactor: 0.05,
+      autoRotate: false,
+      autoRotateSpeed: 2
+    })
+  }
+
   return (
     <div className="app">
       <div className="canvas-container">
         <Canvas
           camera={sceneData?.activeCamera ? {
-            fov: (sceneData.activeCamera as PerspectiveCamera).fov,
+            fov: (sceneData.activeCamera as PerspectiveCamera).fov || 50,
             position: [
               sceneData.activeCamera.position.x,
               sceneData.activeCamera.position.y,
               sceneData.activeCamera.position.z
-            ],
-            rotation: [
-              sceneData.activeCamera.rotation.x,
-              sceneData.activeCamera.rotation.y,
-              sceneData.activeCamera.rotation.z
             ]
           } : {
             position: [5, 5, 5],
@@ -346,26 +267,38 @@ function App() {
           onDrop={handleDrop}
           className={isDragging ? 'dragging' : ''}
         >
-          <Scene modelUrl={modelUrl} sceneData={sceneData} settings={settings} />
+          <Scene
+            sceneData={sceneData}
+            settings={settings}
+            onControlsUpdate={handleControlsUpdate}
+          />
         </Canvas>
-        {!modelUrl && !sceneData && (
+        {!sceneData && (
           <div className="drop-zone">
-            <p>Drag and drop a file here:</p>
-            <ul className="file-types">
-              <li>.gltf / .glb - 3D models</li>
-              <li>.json - Three.js scene files</li>
-            </ul>
+            <p>Drag and drop a Three.js scene.json file here</p>
           </div>
         )}
       </div>
-      
+
       <div className="controls-panel">
-        <h2>OrbitControls Settings</h2>
-        
+        <h2>Model Controls</h2>
+
+        <div className="model-info-display">
+          <h3>Current Model Values</h3>
+          <div className="model-values">
+            <div>Rotation X: <strong>{(currentValues.rotationX * 180 / Math.PI).toFixed(1)}°</strong></div>
+            <div>Rotation Y: <strong>{(currentValues.rotationY * 180 / Math.PI).toFixed(1)}°</strong></div>
+            <div>Scale: <strong>{currentValues.scale.toFixed(2)}</strong></div>
+          </div>
+          <button onClick={resetControls} className="reset-button">
+            Reset to Default
+          </button>
+        </div>
+
         {sceneData?.cameras && sceneData.cameras.length > 1 && (
           <div className="camera-selector">
             <h3>Camera Selection</h3>
-            <select 
+            <select
               value={sceneData.cameras.indexOf(sceneData.activeCamera)}
               onChange={(e) => handleCameraChange(parseInt(e.target.value))}
               aria-label="Select camera view"
@@ -378,89 +311,57 @@ function App() {
             </select>
           </div>
         )}
-        
+
         <div className="control-group">
           <label>
-            Min Distance: {settings.minDistance}
+            Rotation X: {(settings.rotationX * 180 / Math.PI).toFixed(1)}°
+            <input
+              type="range"
+              min={-Math.PI}
+              max={Math.PI}
+              step="0.01"
+              value={settings.rotationX}
+              onChange={(e) => updateSetting('rotationX', parseFloat(e.target.value))}
+            />
+          </label>
+          <div className="control-help">
+            Rotates the model up and down (pitch)
+          </div>
+        </div>
+
+        <div className="control-group">
+          <label>
+            Rotation Y: {(settings.rotationY * 180 / Math.PI).toFixed(1)}°
+            <input
+              type="range"
+              min={-Math.PI}
+              max={Math.PI}
+              step="0.01"
+              value={settings.rotationY}
+              onChange={(e) => updateSetting('rotationY', parseFloat(e.target.value))}
+              disabled={settings.autoRotate}
+            />
+          </label>
+          <div className="control-help">
+            Rotates the model left and right (yaw)
+          </div>
+        </div>
+
+        <div className="control-group">
+          <label>
+            Scale: {settings.scale.toFixed(2)}
             <input
               type="range"
               min="0.1"
-              max="50"
-              step="0.1"
-              value={settings.minDistance}
-              onChange={(e) => updateSetting('minDistance', parseFloat(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-group">
-          <label>
-            Max Distance: {settings.maxDistance}
-            <input
-              type="range"
-              min="1"
-              max="200"
-              step="1"
-              value={settings.maxDistance}
-              onChange={(e) => updateSetting('maxDistance', parseFloat(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-group">
-          <label>
-            Min Polar Angle: {(settings.minPolarAngle * 180 / Math.PI).toFixed(1)}°
-            <input
-              type="range"
-              min="0"
-              max={Math.PI}
+              max="5"
               step="0.01"
-              value={settings.minPolarAngle}
-              onChange={(e) => updateSetting('minPolarAngle', parseFloat(e.target.value))}
+              value={settings.scale}
+              onChange={(e) => updateSetting('scale', parseFloat(e.target.value))}
             />
           </label>
-        </div>
-
-        <div className="control-group">
-          <label>
-            Max Polar Angle: {(settings.maxPolarAngle * 180 / Math.PI).toFixed(1)}°
-            <input
-              type="range"
-              min="0"
-              max={Math.PI}
-              step="0.01"
-              value={settings.maxPolarAngle}
-              onChange={(e) => updateSetting('maxPolarAngle', parseFloat(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-group">
-          <label>
-            Min Azimuth Angle: {settings.minAzimuthAngle === -Infinity ? '-∞' : (settings.minAzimuthAngle * 180 / Math.PI).toFixed(1) + '°'}
-            <input
-              type="range"
-              min={-Math.PI}
-              max={Math.PI}
-              step="0.01"
-              value={settings.minAzimuthAngle === -Infinity ? -Math.PI : settings.minAzimuthAngle}
-              onChange={(e) => updateSetting('minAzimuthAngle', parseFloat(e.target.value))}
-            />
-          </label>
-        </div>
-
-        <div className="control-group">
-          <label>
-            Max Azimuth Angle: {settings.maxAzimuthAngle === Infinity ? '∞' : (settings.maxAzimuthAngle * 180 / Math.PI).toFixed(1) + '°'}
-            <input
-              type="range"
-              min={-Math.PI}
-              max={Math.PI}
-              step="0.01"
-              value={settings.maxAzimuthAngle === Infinity ? Math.PI : settings.maxAzimuthAngle}
-              onChange={(e) => updateSetting('maxAzimuthAngle', parseFloat(e.target.value))}
-            />
-          </label>
+          <div className="control-help">
+            Adjusts the size of the model
+          </div>
         </div>
 
         <div className="control-group">
@@ -472,6 +373,9 @@ function App() {
             />
             Enable Damping
           </label>
+          <div className="control-help">
+            Smooths out model movements
+          </div>
         </div>
 
         {settings.enableDamping && (
@@ -487,6 +391,9 @@ function App() {
                 onChange={(e) => updateSetting('dampingFactor', parseFloat(e.target.value))}
               />
             </label>
+            <div className="control-help">
+              Lower values = smoother movement
+            </div>
           </div>
         )}
 
@@ -518,7 +425,7 @@ function App() {
         )}
 
         <div className="values-display">
-          <h3>Current Values:</h3>
+          <h3>Current Settings:</h3>
           <pre>{JSON.stringify(settings, null, 2)}</pre>
           <button onClick={copyCurrentSettings} className="copy-button">
             Copy Current Settings
@@ -531,7 +438,7 @@ function App() {
             className="json-textarea"
             value={jsonInput}
             onChange={(e) => handleJsonInput(e.target.value)}
-            placeholder="Paste your OrbitControls JSON configuration here..."
+            placeholder="Paste your model control JSON configuration here..."
             rows={10}
           />
           <div className="json-controls">

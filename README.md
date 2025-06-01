@@ -1,82 +1,78 @@
-# OrbitControls GLTF Viewer
+# Model Controls Tester
 
-A React TypeScript application built with Vite for testing and configuring Three.js OrbitControls parameters with GLTF/GLB models exported from Blender.
+A React + TypeScript application for testing Three.js model transformations with scene.json files. This tool helps you find the perfect rotation and scale values for your 3D models, similar to the approach used in kit-builder-api where the camera stays fixed and the model is manipulated.
 
 ## Features
 
-- **Drag & Drop Support**: Simply drag and drop your `.gltf` or `.glb` files onto the canvas
-- **Real-time OrbitControls Configuration**: Adjust all OrbitControls parameters and see changes instantly
-- **Visual Feedback**: Grid, lighting, and environment setup for better model visualization
-- **Parameter Display**: View all current parameter values in JSON format
-- **Responsive Design**: Works on desktop and mobile devices
+- **Drag & Drop**: Simply drag and drop your Three.js scene.json files to load them
+- **Model Transformation Controls**: Adjust rotation (X/Y) and scale in real-time
+- **Fixed Camera**: Camera stays in its original position while you manipulate the model
+- **Multi-Camera Support**: Switch between cameras if your scene has multiple views
+- **Real-time Preview**: See changes instantly as you adjust values
+- **Settings Import/Export**: Save and share your model control configurations as JSON
+- **Smooth Animations**: Optional damping for smooth transitions
+- **Auto-Rotation**: Built-in turntable mode for showcasing models
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js (v14 or higher)
-- npm or yarn
-
 ### Installation
 
-1. Clone the repository:
-```bash
-git clone <your-repo-url>
-cd ObitControlls
-```
-
-2. Install dependencies:
 ```bash
 npm install
-```
-
-3. Start the development server:
-```bash
 npm run dev
 ```
 
-4. Open your browser and navigate to `http://localhost:5173`
+The app will open at `http://localhost:5174/`
 
-## Usage
+### Usage
 
-1. **Load a Model**: Drag and drop a `.gltf` or `.glb` file onto the canvas area
-2. **Adjust Controls**: Use the control panel on the right to adjust OrbitControls parameters:
-   - **Min/Max Distance**: Control zoom limits
-   - **Min/Max Polar Angle**: Control vertical rotation limits (pitch)
-   - **Min/Max Azimuth Angle**: Control horizontal rotation limits (yaw)
-   - **Enable Damping**: Smooth camera movements
-   - **Auto Rotate**: Enable automatic rotation with adjustable speed
+1. **Load a Scene**: Drag and drop a Three.js scene.json file onto the canvas
+2. **Adjust Model**: Use the sliders to rotate and scale your model
+3. **Export Settings**: Copy the JSON configuration for use in your project
 
-3. **View Values**: The current parameter values are displayed at the bottom of the control panel in JSON format
+## Control Parameters
 
-## OrbitControls Parameters Explained
+- **Rotation X**: Rotates the model up and down (pitch) in degrees
+- **Rotation Y**: Rotates the model left and right (yaw) in degrees  
+- **Scale**: Adjusts the size of the model (0.1 to 5x)
+- **Enable Damping**: Smooths out model movements
+- **Damping Factor**: Controls smoothing amount (lower = smoother)
+- **Auto Rotate**: Enables automatic turntable rotation
+- **Auto Rotate Speed**: Controls rotation speed
 
-- **minDistance**: The minimum distance for zooming in (default: 1)
-- **maxDistance**: The maximum distance for zooming out (default: 100)
-- **minPolarAngle**: The minimum vertical angle in radians (0 = looking down)
-- **maxPolarAngle**: The maximum vertical angle in radians (π = looking up)
-- **minAzimuthAngle**: The minimum horizontal rotation angle
-- **maxAzimuthAngle**: The maximum horizontal rotation angle
-- **enableDamping**: Whether to enable inertia/smoothing
-- **dampingFactor**: How much damping to apply (0.01-0.2)
-- **autoRotate**: Whether to automatically rotate the camera
-- **autoRotateSpeed**: Speed of automatic rotation
+## JSON Configuration
 
-## Tips
+You can import/export settings in this format:
 
-- Polar angles are displayed in degrees for easier understanding
-- Use the grid to gauge scale and distance
-- The camera maintains its zoom level when adjusting angle constraints
-- Copy the JSON values to use in your Three.js projects
+```json
+{
+  "rotationX": 0,
+  "rotationY": 0,
+  "scale": 1,
+  "enableDamping": true,
+  "dampingFactor": 0.05,
+  "autoRotate": false,
+  "autoRotateSpeed": 2
+}
+```
 
-## Technologies Used
+## Why Model Controls?
 
-- React 18
-- TypeScript
+This approach matches workflows where:
+- The camera position is fixed in your application
+- Users interact by rotating/scaling the model itself
+- You need consistent camera views across different models
+- You're building configurators or product viewers
+
+Perfect for finding the right display angles without trial and error!
+
+## Development
+
+Built with:
+- React + TypeScript
 - Vite
-- Three.js
-- React Three Fiber
-- React Three Drei
+- Three.js + React Three Fiber
+- @react-three/drei for helpers
 
 ## License
 
