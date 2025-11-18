@@ -458,3 +458,38 @@
 .mode-toggle input[type="checkbox"] {
   cursor: pointer;
 }
+
+.loading-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  background-color: rgba(0, 0, 0, 0.9);
+  padding: 2rem 3rem;
+  border-radius: 12px;
+  border: 2px solid #4a9eff;
+  z-index: 1000;
+}
+
+.loading-overlay p {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #4a9eff;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #1a1a1a;
+  color: #fff;
+  font-family: system-ui, -apple-system, sans-serif;
+}

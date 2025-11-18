@@ -34,6 +34,18 @@ A React + TypeScript application for understanding and configuring Three.js Orbi
 - **Smooth Animations**: Optional damping for smooth transitions
 - **Auto-Rotation**: Built-in turntable mode for showcasing models
 
+## Architecture
+
+This project follows modern React best practices with a clean, modular architecture:
+
+- **📦 261 lines in App.tsx** (down from 783!) - just orchestration, no business logic
+- **🎣 Custom Hooks** - Reusable logic for file loading, scene setup, and settings management
+- **🔧 Services** - Pure functions for file loading and data transformation
+- **🎨 Components** - Small, focused UI components (30-70 lines each)
+- **📝 Full TypeScript** - Type-safe throughout
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed documentation.
+
 ## Getting Started
 
 ### Installation
