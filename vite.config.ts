@@ -8,5 +8,9 @@ export default defineConfig({
   server: {
     port: 5173,
     open: true
-  }
+  },
+  build: {
+    sourcemap: true, // Enable source maps for production builds
+  },
+  // Source maps are enabled by default in dev mode
 })

@@ -1,0 +1,8 @@
+export { AutoRotateControl } from './AutoRotateControl'
+export { CameraSelector } from './CameraSelector'
+export { DampingControl } from './DampingControl'
+export { ModelInfo } from './ModelInfo'
+export { OrbitControlsMapping } from './OrbitControlsMapping'
+export { PositionControl } from './PositionControl'
+export { RotationControl } from './RotationControl'
+export { ScaleControl } from './ScaleControl'

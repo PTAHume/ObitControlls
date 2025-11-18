@@ -1,227 +1,466 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Center, Grid, Environment } from '@react-three/drei'
-import { Object3D, ObjectLoader, Camera, PerspectiveCamera } from 'three'
+import { Box, Divider, ThemeProvider, Typography, createTheme } from '@mui/material'
+import { Canvas } from '@react-three/fiber'
+import JSZip from 'jszip'
+import type React from 'react'
+import { useCallback, useState } from 'react'
+import {
+  Box3,
+  Camera,
+  type Object3D,
+  ObjectLoader,
+  PerspectiveCamera,
+  Vector3,
+  type WebGLRenderer,
+} from 'three'
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import './App.css'
+import {
+  AutoRotateControl,
+  CameraSelector,
+  DampingControl,
+  ModelInfo,
+  OrbitControlsMapping,
+  PositionControl,
+  RotationControl,
+  ScaleControl,
+} from './components/Controls'
+import { Scene } from './components/Scene'
+import { CurrentSettingsDisplay, SettingsImportExport } from './components/Settings'
+import type { CurrentValues, ModelControlsSettings, SceneData } from './types'
+import { roundNumber } from './utils/helpers'
 
-interface ModelControlsSettings {
-  rotationX: number
-  rotationY: number
-  scale: number
-  minRotationX: number
-  maxRotationX: number
-  minRotationY: number
-  maxRotationY: number
-  minScale: number
-  maxScale: number
-  enableDamping: boolean
-  dampingFactor: number
-  autoRotate: boolean
-  autoRotateSpeed: number
-}
-
-interface SceneData {
-  scene: Object3D
-  cameras: Camera[]
-  activeCamera: Camera
-}
-
-function SceneModel({ sceneData }: { sceneData: SceneData | null }) {
-  if (sceneData) {
-    return <primitive object={sceneData.scene} />
-  }
-  return null
-}
-
-function Scene({ sceneData, settings, onControlsUpdate }: {
-  sceneData: SceneData | null,
-  settings: ModelControlsSettings,
-  onControlsUpdate: (rotationX: number, rotationY: number, scale: number) => void
-}) {
-  const modelGroupRef = useRef<any>(null)
-  const { camera } = useThree()
-  const currentRotationX = useRef(0)
-  const currentRotationY = useRef(0)
-  const currentScale = useRef(1)
-
-  // Set camera when scene data changes
-  useEffect(() => {
-    if (sceneData?.activeCamera) {
-      const activeCamera = sceneData.activeCamera
-      camera.position.copy(activeCamera.position)
-      camera.rotation.copy(activeCamera.rotation)
-      if (activeCamera instanceof PerspectiveCamera) {
-        (camera as PerspectiveCamera).fov = activeCamera.fov
-        camera.updateProjectionMatrix()
-      }
-    }
-  }, [sceneData?.activeCamera, camera])
-
-  // Apply model transformations
-  useFrame((_state, delta) => {
-    if (modelGroupRef.current) {
-      // Handle auto rotation
-      if (settings.autoRotate) {
-        currentRotationY.current += delta * settings.autoRotateSpeed * 0.5
-        // Don't apply Y constraints during auto-rotate for continuous rotation
-      }
-
-      // Apply damping or direct values
-      if (settings.enableDamping) {
-        currentRotationX.current += (settings.rotationX - currentRotationX.current) * settings.dampingFactor
-        if (!settings.autoRotate) {
-          currentRotationY.current += (settings.rotationY - currentRotationY.current) * settings.dampingFactor
-        }
-        currentScale.current += (settings.scale - currentScale.current) * settings.dampingFactor
-      } else {
-        currentRotationX.current = settings.rotationX
-        currentRotationY.current = settings.autoRotate ? currentRotationY.current : settings.rotationY
-        currentScale.current = settings.scale
-      }
-
-      // Apply constraints (skip Y constraints if auto-rotating)
-      currentRotationX.current = Math.max(settings.minRotationX, Math.min(settings.maxRotationX, currentRotationX.current))
-      if (!settings.autoRotate) {
-        currentRotationY.current = Math.max(settings.minRotationY, Math.min(settings.maxRotationY, currentRotationY.current))
-      }
-      currentScale.current = Math.max(settings.minScale, Math.min(settings.maxScale, currentScale.current))
-
-      // Apply transformations
-      modelGroupRef.current.rotation.x = currentRotationX.current
-      modelGroupRef.current.rotation.y = currentRotationY.current
-      modelGroupRef.current.scale.setScalar(currentScale.current)
-
-      // Report current values
-      onControlsUpdate(currentRotationX.current, currentRotationY.current, currentScale.current)
-    }
-  })
-
-  return (
-    <>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
-      <Grid infiniteGrid fadeDistance={50} fadeStrength={5} />
-      <Environment preset="studio" />
-
-      <group ref={modelGroupRef}>
-        {sceneData && (
-          <Center>
-            <SceneModel sceneData={sceneData} />
-          </Center>
-        )}
-      </group>
-    </>
-  )
-}
+// Create dark theme for MUI
+const darkTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: {
+      main: '#4a9eff',
+    },
+    background: {
+      default: '#1a1a1a',
+      paper: '#2a2a2a',
+    },
+  },
+  components: {
+    MuiSlider: {
+      styleOverrides: {
+        root: {
+          '& .MuiSlider-thumb': {
+            width: 16,
+            height: 16,
+          },
+        },
+      },
+    },
+  },
+})
 
 function App() {
   const [sceneData, setSceneData] = useState<SceneData | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [jsonInput, setJsonInput] = useState<string>('')
-  const [jsonError, setJsonError] = useState<string>('')
-  const [currentValues, setCurrentValues] = useState({
+  const [jsonInput, setJsonInput] = useState('')
+  const [jsonError, setJsonError] = useState('')
+  const [currentValues, setCurrentValues] = useState<CurrentValues>({
     rotationX: 0,
     rotationY: 0,
-    scale: 1
+    scale: 1,
   })
   const [settings, setSettings] = useState<ModelControlsSettings>({
     rotationX: 0,
     rotationY: 0,
     scale: 1,
+    positionX: 0,
+    positionY: 0,
+    positionZ: 0,
     minRotationX: -Math.PI,
     maxRotationX: Math.PI,
-    minRotationY: -Infinity,
-    maxRotationY: Infinity,
-    minScale: 0.1,
-    maxScale: 5,
-    enableDamping: true,
+    minRotationY: Number.NEGATIVE_INFINITY,
+    maxRotationY: Number.POSITIVE_INFINITY,
+    enableDamping: false,
     dampingFactor: 0.05,
     autoRotate: false,
-    autoRotateSpeed: 2
+    autoRotateSpeed: 2,
+    useRotationXConstraints: false,
+    useRotationYConstraints: false,
   })
 
-  const handleControlsUpdate = useCallback((rotationX: number, rotationY: number, scale: number) => {
-    setCurrentValues({ rotationX, rotationY, scale })
-  }, [])
+  const handleControlsUpdate = useCallback(
+    (rotationX: number, rotationY: number, scale: number) => {
+      setCurrentValues({ rotationX, rotationY, scale })
+    },
+    []
+  )
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }, [])
+  const handleInteractiveChange = useCallback(
+    (rotationX: number, rotationY: number, scale: number) => {
+      setSettings(prev => ({
+        ...prev,
+        rotationX,
+        rotationY,
+        scale,
+      }))
+    },
+    []
+  )
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }, [])
-
-  const handleCameraChange = (index: number) => {
-    if (sceneData && sceneData.cameras[index]) {
-      setSceneData({
-        ...sceneData,
-        activeCamera: sceneData.cameras[index]
-      })
-    }
+  const updateSetting = <K extends keyof ModelControlsSettings>(
+    key: K,
+    value: ModelControlsSettings[K]
+  ) => {
+    setSettings(prev => ({ ...prev, [key]: value }))
   }
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleCameraChange = useCallback(
+    (cameraIndex: number) => {
+      if (!sceneData) return
+
+      const newCamera = sceneData.cameras[cameraIndex]
+      if (newCamera) {
+        setSceneData(prev => (prev ? { ...prev, activeCamera: newCamera } : null))
+      }
+    },
+    [sceneData]
+  )
+
+  // Setup scene with camera auto-positioning
+  const setupSceneWithCamera = useCallback(
+    (loadedScene: Object3D) => {
+      // Find all cameras in the scene
+      const cameras: Camera[] = []
+      loadedScene.traverse(obj => {
+        if (obj instanceof Camera) {
+          cameras.push(obj)
+        }
+      })
+
+      // Calculate bounding box of entire scene
+      const bbox = new Box3().setFromObject(loadedScene)
+      const size = new Vector3()
+      const center = new Vector3()
+      bbox.getSize(size)
+      bbox.getCenter(center)
+
+      // Handle edge cases for bounding box dimensions
+      const maxDim = Math.max(size.x, size.y, size.z)
+      const isInvalidDimension =
+        maxDim === 0 || !Number.isFinite(maxDim) || maxDim < 0.0001 || maxDim > 10000
+
+      let activeCamera: Camera
+
+      if (cameras.length > 0) {
+        activeCamera = cameras[0]
+      } else {
+        // Create default perspective camera with adaptive positioning
+        const perspCamera = new PerspectiveCamera(
+          50,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          2000
+        )
+
+        if (isInvalidDimension) {
+          // Fallback for invalid dimensions
+          perspCamera.position.set(5, 5, 5)
+          perspCamera.lookAt(0, 0, 0)
+          perspCamera.near = 0.01
+          perspCamera.far = 1000
+        } else {
+          // Calculate optimal camera distance based on bounding box
+          const aspect = window.innerWidth / window.innerHeight
+          const fov = perspCamera.fov * (Math.PI / 180)
+          const verticalFit = size.y / 2 / Math.tan(fov / 2)
+          const horizontalFit = size.x / 2 / Math.tan(fov / 2) / aspect
+
+          // Use the larger distance to ensure entire model is visible, with padding
+          let cameraDistance = Math.max(verticalFit, horizontalFit) * 2.0
+
+          // Add extra padding based on depth
+          cameraDistance = Math.max(cameraDistance, size.z * 1.5)
+
+          // Position camera at calculated distance
+          const direction = new Vector3(1, 1, 1).normalize()
+          perspCamera.position.copy(center).addScaledVector(direction, cameraDistance)
+          perspCamera.lookAt(center)
+
+          // Set near/far planes adaptively
+          perspCamera.near = Math.max(0.01, cameraDistance * 0.01)
+          perspCamera.far = Math.max(100, cameraDistance * 10)
+        }
+
+        perspCamera.updateProjectionMatrix()
+        activeCamera = perspCamera
+        cameras.push(perspCamera)
+      }
+
+      setSceneData({ scene: loadedScene, cameras, activeCamera })
+
+      // Auto-reset rotation, scale, and position when loading new model
+      if (sceneData) {
+        setSettings(prev => ({
+          ...prev,
+          rotationX: 0,
+          rotationY: 0,
+          scale: 1,
+          positionX: 0,
+          positionY: 0,
+          positionZ: 0,
+        }))
+      }
+
+      setJsonError('Model loaded successfully!')
+      setTimeout(() => setJsonError(''), 3000)
+    },
+    [sceneData]
+  )
+
+  // Helper function to load JSON scene
+  const loadJsonScene = useCallback(
+    (data: string) => {
+      try {
+        const json = JSON.parse(data)
+        const loader = new ObjectLoader()
+
+        loader.parse(json, object => {
+          setupSceneWithCamera(object)
+        })
+      } catch (error: unknown) {
+        console.error('Scene loading error:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        setJsonError(`Failed to parse scene JSON: ${errorMessage}`)
+        setTimeout(() => setJsonError(''), 5000)
+      }
+    },
+    [setupSceneWithCamera]
+  )
+
+  // Helper function to load GLTF/GLB
+  const loadGltf = useCallback(
+    (arrayBuffer: ArrayBuffer, fileName?: string) => {
+      try {
+        const loader = new GLTFLoader()
+
+        // Set up Draco decoder for compressed models
+        const dracoLoader = new DRACOLoader()
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
+        loader.setDRACOLoader(dracoLoader)
+
+        // Set up KTX2 decoder for compressed textures
+        const ktx2Loader = new KTX2Loader()
+        ktx2Loader.setTranscoderPath('https://unpkg.com/three@0.181.1/examples/jsm/libs/basis/')
+        const canvas = document.createElement('canvas')
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
+        if (gl) {
+          ktx2Loader.detectSupport({ getContext: () => gl } as unknown as WebGLRenderer)
+        }
+        loader.setKTX2Loader(ktx2Loader)
+
+        // Check if this might actually be a ZIP file
+        const uint8Array = new Uint8Array(arrayBuffer)
+        const magicBytes = uint8Array.slice(0, 4)
+        const isPossiblyZip =
+          magicBytes[0] === 0x50 &&
+          magicBytes[1] === 0x4b &&
+          (magicBytes[2] === 0x03 || magicBytes[2] === 0x05 || magicBytes[2] === 0x07)
+
+        if (isPossiblyZip) {
+          console.warn(
+            `File "${fileName}" appears to be a ZIP archive, not a GLB file. Attempting to extract...`
+          )
+          setJsonError('File appears to be a ZIP archive, not a GLB file. Attempting to extract...')
+          setTimeout(() => setJsonError(''), 5000)
+          loadZip(arrayBuffer)
+          dracoLoader.dispose()
+          ktx2Loader.dispose()
+          return
+        }
+
+        loader.parse(
+          arrayBuffer,
+          '',
+          gltf => {
+            console.log('GLTF loaded:', gltf)
+            setupSceneWithCamera(gltf.scene)
+            dracoLoader.dispose()
+            ktx2Loader.dispose()
+          },
+          error => {
+            console.error('GLTF loading error:', error)
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            setJsonError(`Failed to load GLTF/GLB: ${errorMessage}`)
+            setTimeout(() => setJsonError(''), 5000)
+            dracoLoader.dispose()
+            ktx2Loader.dispose()
+          }
+        )
+      } catch (error: unknown) {
+        console.error('GLTF setup error:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        setJsonError(`GLTF setup failed: ${errorMessage}`)
+        setTimeout(() => setJsonError(''), 5000)
+      }
+    },
+    [setupSceneWithCamera]
+  )
+
+  // Helper function to load OBJ
+  const loadObj = useCallback(
+    (data: string) => {
+      try {
+        const loader = new OBJLoader()
+        const obj = loader.parse(data)
+        setupSceneWithCamera(obj)
+      } catch (error: unknown) {
+        console.error('OBJ loading error:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        setJsonError(`Failed to load OBJ: ${errorMessage}`)
+        setTimeout(() => setJsonError(''), 5000)
+      }
+    },
+    [setupSceneWithCamera]
+  )
+
+  // Helper function to load ZIP files
+  const loadZip = useCallback(
+    async (arrayBuffer: ArrayBuffer) => {
+      try {
+        const zip = new JSZip()
+        const loadedZip = await zip.loadAsync(arrayBuffer)
+
+        // Find the first 3D file in the ZIP
+        const fileEntries = Object.entries(loadedZip.files)
+        let found = false
+
+        for (const [filename, zipEntry] of fileEntries) {
+          // Skip directories and system files
+          if (zipEntry.dir || filename.includes('__MACOSX') || filename.startsWith('.')) {
+            continue
+          }
+
+          const lowerName = filename.toLowerCase()
+
+          if (lowerName.endsWith('.json')) {
+            console.log(`Loading JSON scene from ZIP: ${filename}`)
+            const content = await zipEntry.async('string')
+            loadJsonScene(content)
+            found = true
+            break
+          }
+          if (lowerName.endsWith('.gltf')) {
+            console.log(`Loading GLTF from ZIP: ${filename}`)
+            const content = await zipEntry.async('string')
+            loadJsonScene(content)
+            found = true
+            break
+          }
+          if (lowerName.endsWith('.glb')) {
+            console.log(`Loading GLB from ZIP: ${filename}`)
+            const buffer = await zipEntry.async('arraybuffer')
+            loadGltf(buffer, filename)
+            found = true
+            break
+          }
+          if (lowerName.endsWith('.obj')) {
+            console.log(`Loading OBJ from ZIP: ${filename}`)
+            const content = await zipEntry.async('string')
+            loadObj(content)
+            found = true
+            break
+          }
+        }
+
+        if (!found) {
+          setJsonError(
+            'No supported 3D file found in ZIP (.json, .gltf, .glb, .obj). Check the archive contents.'
+          )
+          setTimeout(() => setJsonError(''), 5000)
+        }
+      } catch (error: unknown) {
+        console.error('ZIP loading error:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        setJsonError(`Failed to extract ZIP: ${errorMessage}`)
+        setTimeout(() => setJsonError(''), 5000)
+      }
+    },
+    [loadJsonScene, loadGltf, loadObj]
+  )
+
+  // Helper to determine file type and load accordingly
+  const loadFileByExtension = useCallback(
+    (file: File, arrayBuffer: ArrayBuffer) => {
+      const fileName = file.name.toLowerCase()
+      console.log(`Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`)
+
+      // Check for ZIP magic bytes first
+      const uint8Array = new Uint8Array(arrayBuffer)
+      const magicBytes = uint8Array.slice(0, 4)
+      const isZipByMagicBytes =
+        magicBytes[0] === 0x50 &&
+        magicBytes[1] === 0x4b &&
+        (magicBytes[2] === 0x03 || magicBytes[2] === 0x05 || magicBytes[2] === 0x07)
+
+      if (isZipByMagicBytes) {
+        console.log(
+          `Detected ZIP file by magic bytes: ${Array.from(magicBytes.slice(0, 4))
+            .map(b => `0x${b.toString(16).padStart(2, '0')}`)
+            .join(' ')}`
+        )
+        loadZip(arrayBuffer)
+        return
+      }
+
+      // Fall back to extension-based detection
+      if (fileName.endsWith('.zip')) {
+        loadZip(arrayBuffer)
+      } else if (fileName.endsWith('.json')) {
+        const decoder = new TextDecoder()
+        const text = decoder.decode(arrayBuffer)
+        loadJsonScene(text)
+      } else if (fileName.endsWith('.glb') || fileName.endsWith('.gltf')) {
+        loadGltf(arrayBuffer, file.name)
+      } else if (fileName.endsWith('.obj')) {
+        const decoder = new TextDecoder()
+        const text = decoder.decode(arrayBuffer)
+        loadObj(text)
+      } else {
+        setJsonError(
+          `Unsupported file type: ${file.name}. Please use .json, .gltf, .glb, .obj, or .zip`
+        )
+        setTimeout(() => setJsonError(''), 5000)
+      }
+    },
+    [loadZip, loadJsonScene, loadGltf, loadObj]
+  )
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = () => {
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
 
     const file = e.dataTransfer.files[0]
-    if (file && file.name.endsWith('.json')) {
-      const reader = new FileReader()
-      reader.onload = (event) => {
-        try {
-          const json = JSON.parse(event.target?.result as string)
+    if (!file) return
 
-          const loader = new ObjectLoader()
-          const cameras: Camera[] = []
-          let defaultCamera: Camera | undefined
-
-          // Simple parse - let ObjectLoader handle the format detection
-          loader.parse(json, (object) => {
-            // Find all cameras in the scene
-            object.traverse((child) => {
-              if (child instanceof Camera) {
-                cameras.push(child)
-                if (!defaultCamera) defaultCamera = child
-              }
-            })
-
-            // If no cameras found, create a default one
-            if (cameras.length === 0) {
-              const defaultCam = new PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000)
-              defaultCam.position.set(5, 5, 5)
-              defaultCam.lookAt(0, 0, 0)
-              cameras.push(defaultCam)
-              defaultCamera = defaultCam
-            }
-
-            setSceneData({
-              scene: object,
-              cameras: cameras,
-              activeCamera: defaultCamera!
-            })
-            setJsonError('Scene loaded successfully!')
-            setTimeout(() => setJsonError(''), 3000)
-          })
-        } catch (error: any) {
-          console.error('Scene loading error:', error)
-          setJsonError(`Failed to parse scene JSON: ${error?.message || error}`)
-          setTimeout(() => setJsonError(''), 5000)
-        }
+    const reader = new FileReader()
+    reader.onload = event => {
+      const arrayBuffer = event.target?.result
+      if (arrayBuffer instanceof ArrayBuffer) {
+        loadFileByExtension(file, arrayBuffer)
       }
-      reader.readAsText(file)
-    } else {
-      alert('Please drop a .json scene file')
     }
-  }, [])
-
-  const updateSetting = (key: keyof ModelControlsSettings, value: number | boolean) => {
-    setSettings(prev => ({ ...prev, [key]: value }))
+    reader.readAsArrayBuffer(file)
   }
 
-  const handleJsonInput = (value: string) => {
+  const handleJsonInputChange = (value: string) => {
     setJsonInput(value)
     setJsonError('')
   }
@@ -230,33 +469,126 @@ function App() {
     try {
       const parsed = JSON.parse(jsonInput)
 
-      // Validate that all required keys are present and have correct types
-      const validSettings: ModelControlsSettings = {
-        rotationX: typeof parsed.rotationX === 'number' ? parsed.rotationX : settings.rotationX,
-        rotationY: typeof parsed.rotationY === 'number' ? parsed.rotationY : settings.rotationY,
-        scale: typeof parsed.scale === 'number' ? parsed.scale : settings.scale,
-        minRotationX: typeof parsed.minRotationX === 'number' ? parsed.minRotationX : settings.minRotationX,
-        maxRotationX: typeof parsed.maxRotationX === 'number' ? parsed.maxRotationX : settings.maxRotationX,
-        minRotationY: typeof parsed.minRotationY === 'number' ? parsed.minRotationY : settings.minRotationY,
-        maxRotationY: typeof parsed.maxRotationY === 'number' ? parsed.maxRotationY : settings.maxRotationY,
-        minScale: typeof parsed.minScale === 'number' ? parsed.minScale : settings.minScale,
-        maxScale: typeof parsed.maxScale === 'number' ? parsed.maxScale : settings.maxScale,
-        enableDamping: typeof parsed.enableDamping === 'boolean' ? parsed.enableDamping : settings.enableDamping,
-        dampingFactor: typeof parsed.dampingFactor === 'number' ? parsed.dampingFactor : settings.dampingFactor,
-        autoRotate: typeof parsed.autoRotate === 'boolean' ? parsed.autoRotate : settings.autoRotate,
-        autoRotateSpeed: typeof parsed.autoRotateSpeed === 'number' ? parsed.autoRotateSpeed : settings.autoRotateSpeed,
+      // Start with current settings
+      const validSettings: ModelControlsSettings = { ...settings }
+
+      // Support OrbitControls-style properties
+      if (typeof parsed.minPolarAngle === 'number') {
+        validSettings.minRotationX = parsed.minPolarAngle
+        validSettings.useRotationXConstraints = true
       }
+      if (typeof parsed.maxPolarAngle === 'number') {
+        validSettings.maxRotationX = parsed.maxPolarAngle
+        validSettings.useRotationXConstraints = true
+      }
+      if (typeof parsed.minAzimuthAngle === 'number') {
+        validSettings.minRotationY = parsed.minAzimuthAngle
+        validSettings.useRotationYConstraints = true
+      }
+      if (typeof parsed.maxAzimuthAngle === 'number') {
+        validSettings.maxRotationY = parsed.maxAzimuthAngle
+        validSettings.useRotationYConstraints = true
+      }
+
+      // Support direct model control properties
+      if (typeof parsed.rotationX === 'number') validSettings.rotationX = parsed.rotationX
+      if (typeof parsed.rotationY === 'number') validSettings.rotationY = parsed.rotationY
+      if (typeof parsed.scale === 'number') validSettings.scale = parsed.scale
+      if (typeof parsed.positionX === 'number') validSettings.positionX = parsed.positionX
+      if (typeof parsed.positionY === 'number') validSettings.positionY = parsed.positionY
+      if (typeof parsed.positionZ === 'number') validSettings.positionZ = parsed.positionZ
+      if (typeof parsed.minRotationX === 'number') {
+        validSettings.minRotationX = parsed.minRotationX
+        validSettings.useRotationXConstraints = true
+      }
+      if (typeof parsed.maxRotationX === 'number') {
+        validSettings.maxRotationX = parsed.maxRotationX
+        validSettings.useRotationXConstraints = true
+      }
+      if (typeof parsed.minRotationY === 'number') {
+        validSettings.minRotationY = parsed.minRotationY
+        validSettings.useRotationYConstraints = true
+      }
+      if (typeof parsed.maxRotationY === 'number') {
+        validSettings.maxRotationY = parsed.maxRotationY
+        validSettings.useRotationYConstraints = true
+      }
+      if (typeof parsed.enableDamping === 'boolean')
+        validSettings.enableDamping = parsed.enableDamping
+      if (typeof parsed.dampingFactor === 'number')
+        validSettings.dampingFactor = parsed.dampingFactor
+      if (typeof parsed.autoRotate === 'boolean') validSettings.autoRotate = parsed.autoRotate
+      if (typeof parsed.autoRotateSpeed === 'number')
+        validSettings.autoRotateSpeed = parsed.autoRotateSpeed
 
       setSettings(validSettings)
       setJsonError('Settings applied successfully!')
       setTimeout(() => setJsonError(''), 3000)
-    } catch (error) {
+    } catch (_error) {
       setJsonError('Invalid JSON format. Please check your input.')
     }
   }
 
+  // Build minimal export settings
+  const getExportSettings = useCallback(() => {
+    const exportSettings: Record<string, unknown> = {}
+
+    // Only include rotation/scale/position if they differ from defaults
+    if (roundNumber(settings.rotationX) !== 0)
+      exportSettings.rotationX = roundNumber(settings.rotationX)
+    if (roundNumber(settings.rotationY) !== 0)
+      exportSettings.rotationY = roundNumber(settings.rotationY)
+    if (roundNumber(settings.scale) !== 1) exportSettings.scale = roundNumber(settings.scale)
+    if (roundNumber(settings.positionX) !== 0)
+      exportSettings.positionX = roundNumber(settings.positionX)
+    if (roundNumber(settings.positionY) !== 0)
+      exportSettings.positionY = roundNumber(settings.positionY)
+    if (roundNumber(settings.positionZ) !== 0)
+      exportSettings.positionZ = roundNumber(settings.positionZ)
+
+    // Add constraints only if enabled
+    if (settings.useRotationXConstraints) {
+      exportSettings.minRotationX = roundNumber(settings.minRotationX)
+      exportSettings.maxRotationX = roundNumber(settings.maxRotationX)
+    }
+    if (settings.useRotationYConstraints) {
+      exportSettings.minRotationY =
+        settings.minRotationY === Number.NEGATIVE_INFINITY
+          ? Number.NEGATIVE_INFINITY
+          : roundNumber(settings.minRotationY)
+      exportSettings.maxRotationY =
+        settings.maxRotationY === Number.POSITIVE_INFINITY
+          ? Number.POSITIVE_INFINITY
+          : roundNumber(settings.maxRotationY)
+    }
+
+    // Only include damping if enabled
+    if (settings.enableDamping) {
+      exportSettings.enableDamping = true
+      if (roundNumber(settings.dampingFactor) !== 0.05) {
+        exportSettings.dampingFactor = roundNumber(settings.dampingFactor)
+      }
+    }
+
+    // Only include auto-rotate if enabled
+    if (settings.autoRotate) {
+      exportSettings.autoRotate = true
+      if (roundNumber(settings.autoRotateSpeed) !== 2) {
+        exportSettings.autoRotateSpeed = roundNumber(settings.autoRotateSpeed)
+      }
+    }
+
+    return exportSettings
+  }, [settings])
+
   const copyCurrentSettings = () => {
-    const jsonString = JSON.stringify(settings, null, 2)
+    const exportSettings = getExportSettings()
+    if (Object.keys(exportSettings).length === 0) {
+      setJsonError('All settings are at default values - nothing to export!')
+      setTimeout(() => setJsonError(''), 3000)
+      return
+    }
+    const jsonString = JSON.stringify(exportSettings, null, 2)
     setJsonInput(jsonString)
     navigator.clipboard.writeText(jsonString)
     setJsonError('Settings copied to clipboard!')
@@ -268,389 +600,182 @@ function App() {
       rotationX: 0,
       rotationY: 0,
       scale: 1,
+      positionX: 0,
+      positionY: 0,
+      positionZ: 0,
       minRotationX: -Math.PI,
       maxRotationX: Math.PI,
-      minRotationY: -Infinity,
-      maxRotationY: Infinity,
-      minScale: 0.1,
-      maxScale: 5,
-      enableDamping: true,
+      minRotationY: Number.NEGATIVE_INFINITY,
+      maxRotationY: Number.POSITIVE_INFINITY,
+      enableDamping: false,
       dampingFactor: 0.05,
       autoRotate: false,
-      autoRotateSpeed: 2
+      autoRotateSpeed: 2,
+      useRotationXConstraints: false,
+      useRotationYConstraints: false,
     })
   }
 
+  const clearScene = () => {
+    setSceneData(null)
+    setJsonError('Scene cleared. Drop a 3D file to load.')
+    setTimeout(() => setJsonError(''), 3000)
+  }
+
+  const resetView = () => {
+    setSettings(prev => ({
+      ...prev,
+      rotationX: 0,
+      rotationY: 0,
+      scale: 1,
+      positionX: 0,
+      positionY: 0,
+      positionZ: 0,
+    }))
+    setJsonError('View reset to defaults.')
+    setTimeout(() => setJsonError(''), 2000)
+  }
+
+  const exportSettingsObj = getExportSettings()
+  const hasExportSettings = Object.keys(exportSettingsObj).length > 0
+
   return (
-    <div className="app">
-      <div className="canvas-container">
-        <Canvas
-          camera={sceneData?.activeCamera ? {
-            fov: (sceneData.activeCamera as PerspectiveCamera).fov || 50,
-            position: [
-              sceneData.activeCamera.position.x,
-              sceneData.activeCamera.position.y,
-              sceneData.activeCamera.position.z
-            ]
-          } : {
-            position: [5, 5, 5],
-            fov: 50
-          }}
+    <ThemeProvider theme={darkTheme}>
+      <div className="app">
+        <div
+          className={`canvas-container ${isDragging ? 'dragging' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={isDragging ? 'dragging' : ''}
         >
-          <Scene
-            sceneData={sceneData}
-            settings={settings}
-            onControlsUpdate={handleControlsUpdate}
-          />
-        </Canvas>
-        {!sceneData && (
-          <div className="drop-zone">
-            <p>Drag and drop a Three.js scene.json file here</p>
-          </div>
-        )}
-      </div>
-
-      <div className="controls-panel">
-        <h2>Model Controls</h2>
-
-        <div className="model-info-display">
-          <h3>Current Model Values</h3>
-          <div className="model-values">
-            <div>Rotation X: <strong>{(currentValues.rotationX * 180 / Math.PI).toFixed(1)}°</strong></div>
-            <div>Rotation Y: <strong>{(currentValues.rotationY * 180 / Math.PI).toFixed(1)}°</strong></div>
-            <div>Scale: <strong>{currentValues.scale.toFixed(2)}</strong></div>
-          </div>
-          <button onClick={resetControls} className="reset-button">
-            Reset to Default
-          </button>
-        </div>
-
-        {sceneData?.cameras && sceneData.cameras.length > 1 && (
-          <div className="camera-selector">
-            <h3>Camera Selection</h3>
-            <select
-              value={sceneData.cameras.indexOf(sceneData.activeCamera)}
-              onChange={(e) => handleCameraChange(parseInt(e.target.value))}
-              aria-label="Select camera view"
-            >
-              {sceneData.cameras.map((camera, index) => (
-                <option key={index} value={index}>
-                  Camera {index + 1} {camera instanceof PerspectiveCamera ? `(FOV: ${camera.fov}°)` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <details className="orbit-controls-mapping">
-          <summary style={{ cursor: 'pointer', padding: '0.75rem', backgroundColor: '#1a1a1a', borderRadius: '8px', marginBottom: '1rem' }}>
-            <strong style={{ color: '#4a9eff' }}>📚 OrbitControls → Model Controls Mapping</strong>
-          </summary>
-          <div style={{ backgroundColor: '#1a1a1a', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
-            <p style={{ marginBottom: '1rem' }}>
-              This tool achieves the same visual results as OrbitControls but by manipulating the model instead of the camera:
-            </p>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #444' }}>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', color: '#4a9eff' }}>OrbitControls</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem', color: '#4a9eff' }}>Model Controls</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '0.5rem' }}>minPolarAngle / maxPolarAngle</td>
-                  <td style={{ padding: '0.5rem' }}>minRotationX / maxRotationX</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '0.5rem' }}>minAzimuthAngle / maxAzimuthAngle</td>
-                  <td style={{ padding: '0.5rem' }}>minRotationY / maxRotationY</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '0.5rem' }}>minDistance / maxDistance</td>
-                  <td style={{ padding: '0.5rem' }}>maxScale / minScale (inverted)</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '0.5rem' }}>enableDamping / dampingFactor</td>
-                  <td style={{ padding: '0.5rem' }}>enableDamping / dampingFactor</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '0.5rem' }}>autoRotate / autoRotateSpeed</td>
-                  <td style={{ padding: '0.5rem' }}>autoRotate / autoRotateSpeed</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '0.5rem' }}>enableZoom</td>
-                  <td style={{ padding: '0.5rem' }}>Scale constraints</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #333' }}>
-                  <td style={{ padding: '0.5rem' }}>enableRotate</td>
-                  <td style={{ padding: '0.5rem' }}>Rotation constraints</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '0.5rem' }}>enablePan</td>
-                  <td style={{ padding: '0.5rem' }}>Not needed (camera fixed)</td>
-                </tr>
-              </tbody>
-            </table>
-            <p style={{ marginTop: '1rem', marginBottom: '0', fontStyle: 'italic', color: '#888' }}>
-              💡 Tip: Scale is inverted - smaller scale = camera farther away, larger scale = camera closer
-            </p>
-          </div>
-        </details>
-
-        <div className="control-group main">
-          <label>
-            Rotation X: {(settings.rotationX * 180 / Math.PI).toFixed(1)}°
-            <input
-              type="range"
-              min={settings.minRotationX}
-              max={settings.maxRotationX}
-              step="0.01"
-              value={settings.rotationX}
-              onChange={(e) => updateSetting('rotationX', parseFloat(e.target.value))}
+          <Canvas>
+            <Scene
+              sceneData={sceneData}
+              settings={settings}
+              onControlsUpdate={handleControlsUpdate}
+              onInteractiveChange={handleInteractiveChange}
             />
-          </label>
-          <div className="control-help">
-            Rotates the model up and down (pitch)
-          </div>
-        </div>
-
-        <div className="constraint-group">
-          <h4>X Rotation Constraints</h4>
-          <div className="control-help" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}>
-            Similar to OrbitControls' minPolarAngle/maxPolarAngle but for model rotation.
-            In OrbitControls: camera orbits vertically. Here: model rotates up/down.
-          </div>
-          <div className="control-group constraint">
-            <label>
-              Min Rotation X: {(settings.minRotationX * 180 / Math.PI).toFixed(1)}°
-              <input
-                type="range"
-                min={-Math.PI}
-                max={0}
-                step="0.01"
-                value={settings.minRotationX}
-                onChange={(e) => updateSetting('minRotationX', parseFloat(e.target.value))}
-              />
-            </label>
-          </div>
-
-          <div className="control-group constraint">
-            <label>
-              Max Rotation X: {(settings.maxRotationX * 180 / Math.PI).toFixed(1)}°
-              <input
-                type="range"
-                min={0}
-                max={Math.PI}
-                step="0.01"
-                value={settings.maxRotationX}
-                onChange={(e) => updateSetting('maxRotationX', parseFloat(e.target.value))}
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="control-group main">
-          <label>
-            Rotation Y: {(settings.rotationY * 180 / Math.PI).toFixed(1)}°
-            <input
-              type="range"
-              min={settings.minRotationY === -Infinity ? -Math.PI : settings.minRotationY}
-              max={settings.maxRotationY === Infinity ? Math.PI : settings.maxRotationY}
-              step="0.01"
-              value={settings.rotationY}
-              onChange={(e) => updateSetting('rotationY', parseFloat(e.target.value))}
-              disabled={settings.autoRotate}
-            />
-          </label>
-          <div className="control-help">
-            Rotates the model left and right (yaw)
-          </div>
-        </div>
-
-        <div className="constraint-group">
-          <h4>Y Rotation Constraints</h4>
-          <div className="control-help" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}>
-            Similar to OrbitControls' minAzimuthAngle/maxAzimuthAngle but for model rotation.
-            In OrbitControls: camera orbits horizontally. Here: model rotates left/right.
-            Note: Constraints don't apply during auto-rotate for continuous spin.
-          </div>
-          <div className="control-group constraint">
-            <label>
-              Min Rotation Y: {settings.minRotationY === -Infinity ? '-∞' : (settings.minRotationY * 180 / Math.PI).toFixed(1) + '°'}
-              <input
-                type="range"
-                min={-Math.PI}
-                max={Math.PI}
-                step="0.01"
-                value={settings.minRotationY === -Infinity ? -Math.PI : settings.minRotationY}
-                onChange={(e) => updateSetting('minRotationY', parseFloat(e.target.value))}
-              />
-            </label>
-          </div>
-
-          <div className="control-group constraint">
-            <label>
-              Max Rotation Y: {settings.maxRotationY === Infinity ? '∞' : (settings.maxRotationY * 180 / Math.PI).toFixed(1) + '°'}
-              <input
-                type="range"
-                min={-Math.PI}
-                max={Math.PI}
-                step="0.01"
-                value={settings.maxRotationY === Infinity ? Math.PI : settings.maxRotationY}
-                onChange={(e) => updateSetting('maxRotationY', parseFloat(e.target.value))}
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="control-group main">
-          <label>
-            Scale: {settings.scale.toFixed(2)}
-            <input
-              type="range"
-              min={settings.minScale}
-              max={settings.maxScale}
-              step="0.01"
-              value={settings.scale}
-              onChange={(e) => updateSetting('scale', parseFloat(e.target.value))}
-            />
-          </label>
-          <div className="control-help">
-            Adjusts the size of the model
-          </div>
-        </div>
-
-        <div className="constraint-group">
-          <h4>Scale Constraints</h4>
-          <div className="control-help" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}>
-            Similar to OrbitControls' minDistance/maxDistance but inverted for model scale.
-            In OrbitControls: camera zoom limits. Here: model size limits.
-            Small scale = zoomed out view, Large scale = zoomed in view.
-          </div>
-          <div className="control-group constraint">
-            <label>
-              Min Scale: {settings.minScale.toFixed(2)}
-              <input
-                type="range"
-                min="0.1"
-                max="2"
-                step="0.01"
-                value={settings.minScale}
-                onChange={(e) => updateSetting('minScale', parseFloat(e.target.value))}
-              />
-            </label>
-          </div>
-
-          <div className="control-group constraint">
-            <label>
-              Max Scale: {settings.maxScale.toFixed(2)}
-              <input
-                type="range"
-                min="1"
-                max="10"
-                step="0.1"
-                value={settings.maxScale}
-                onChange={(e) => updateSetting('maxScale', parseFloat(e.target.value))}
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="control-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={settings.enableDamping}
-              onChange={(e) => updateSetting('enableDamping', e.target.checked)}
-            />
-            Enable Damping
-          </label>
-          <div className="control-help">
-            Smooths out model movements
-          </div>
-        </div>
-
-        {settings.enableDamping && (
-          <div className="control-group">
-            <label>
-              Damping Factor: {settings.dampingFactor}
-              <input
-                type="range"
-                min="0.01"
-                max="0.2"
-                step="0.01"
-                value={settings.dampingFactor}
-                onChange={(e) => updateSetting('dampingFactor', parseFloat(e.target.value))}
-              />
-            </label>
-            <div className="control-help">
-              Lower values = smoother movement
+          </Canvas>
+          {!sceneData && (
+            <div className="drop-zone">
+              <p>Drag and drop your 3D model here</p>
+              <ul className="file-types">
+                <li>Three.js Scene (.json)</li>
+                <li>GLTF / GLB (.gltf, .glb)</li>
+                <li>Wavefront OBJ (.obj)</li>
+                <li>ZIP archives (.zip) containing any of the above</li>
+              </ul>
             </div>
-          </div>
-        )}
-
-        <div className="control-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={settings.autoRotate}
-              onChange={(e) => updateSetting('autoRotate', e.target.checked)}
-            />
-            Auto Rotate
-          </label>
+          )}
+          {sceneData && (
+            <div className="interaction-hint">
+              <p>
+                🖱️ <strong>Drag</strong> to rotate • <strong>Scroll</strong> to zoom
+              </p>
+            </div>
+          )}
         </div>
 
-        {settings.autoRotate && (
-          <div className="control-group">
-            <label>
-              Auto Rotate Speed: {settings.autoRotateSpeed}
-              <input
-                type="range"
-                min="0.1"
-                max="10"
-                step="0.1"
-                value={settings.autoRotateSpeed}
-                onChange={(e) => updateSetting('autoRotateSpeed', parseFloat(e.target.value))}
-              />
-            </label>
-          </div>
-        )}
+        <Box
+          sx={{
+            width: 450,
+            bgcolor: 'background.paper',
+            p: 3,
+            overflowY: 'auto',
+            borderLeft: 1,
+            borderColor: 'divider',
+          }}
+        >
+          <Typography variant="h5" gutterBottom>
+            Model Controls
+          </Typography>
 
-        <div className="values-display">
-          <h3>Current Settings:</h3>
-          <pre>{JSON.stringify(settings, null, 2)}</pre>
-          <button onClick={copyCurrentSettings} className="copy-button">
-            Copy Current Settings
-          </button>
-        </div>
-
-        <div className="json-input-section">
-          <h3>Import JSON Settings:</h3>
-          <textarea
-            className="json-textarea"
-            value={jsonInput}
-            onChange={(e) => handleJsonInput(e.target.value)}
-            placeholder="Paste your model control JSON configuration here..."
-            rows={10}
+          <ModelInfo
+            currentValues={currentValues}
+            hasScene={!!sceneData}
+            onResetControls={resetControls}
+            onResetView={resetView}
+            onClearScene={clearScene}
           />
-          <div className="json-controls">
-            <button onClick={applyJsonSettings} className="apply-button">
-              Apply Settings
-            </button>
-            {jsonError && (
-              <div className={`json-message ${jsonError.includes('success') ? 'success' : 'error'}`}>
-                {jsonError}
-              </div>
-            )}
-          </div>
-        </div>
+
+          {sceneData && (
+            <CameraSelector sceneData={sceneData} onCameraChange={handleCameraChange} />
+          )}
+
+          <OrbitControlsMapping />
+
+          <RotationControl
+            axis="X"
+            value={settings.rotationX}
+            minValue={settings.minRotationX}
+            maxValue={settings.maxRotationX}
+            useConstraints={settings.useRotationXConstraints}
+            sliderMin={settings.minRotationX}
+            sliderMax={settings.maxRotationX}
+            onValueChange={value => updateSetting('rotationX', value)}
+            onMinChange={value => updateSetting('minRotationX', value)}
+            onMaxChange={value => updateSetting('maxRotationX', value)}
+            onConstraintsToggle={enabled => updateSetting('useRotationXConstraints', enabled)}
+          />
+
+          <RotationControl
+            axis="Y"
+            value={settings.rotationY}
+            minValue={settings.minRotationY}
+            maxValue={settings.maxRotationY}
+            useConstraints={settings.useRotationYConstraints}
+            sliderMin={
+              settings.minRotationY === Number.NEGATIVE_INFINITY ? -Math.PI : settings.minRotationY
+            }
+            sliderMax={
+              settings.maxRotationY === Number.POSITIVE_INFINITY ? Math.PI : settings.maxRotationY
+            }
+            disabled={settings.autoRotate}
+            onValueChange={value => updateSetting('rotationY', value)}
+            onMinChange={value => updateSetting('minRotationY', value)}
+            onMaxChange={value => updateSetting('maxRotationY', value)}
+            onConstraintsToggle={enabled => updateSetting('useRotationYConstraints', enabled)}
+          />
+
+          <ScaleControl value={settings.scale} onChange={value => updateSetting('scale', value)} />
+
+          <PositionControl
+            positionX={settings.positionX}
+            positionY={settings.positionY}
+            positionZ={settings.positionZ}
+            onPositionXChange={value => updateSetting('positionX', value)}
+            onPositionYChange={value => updateSetting('positionY', value)}
+            onPositionZChange={value => updateSetting('positionZ', value)}
+          />
+
+          <DampingControl
+            enabled={settings.enableDamping}
+            factor={settings.dampingFactor}
+            onEnabledChange={enabled => updateSetting('enableDamping', enabled)}
+            onFactorChange={factor => updateSetting('dampingFactor', factor)}
+          />
+
+          <AutoRotateControl
+            enabled={settings.autoRotate}
+            speed={settings.autoRotateSpeed}
+            onEnabledChange={enabled => updateSetting('autoRotate', enabled)}
+            onSpeedChange={speed => updateSetting('autoRotateSpeed', speed)}
+          />
+
+          <Divider sx={{ my: 3 }} />
+
+          <SettingsImportExport
+            jsonInput={jsonInput}
+            jsonError={jsonError}
+            onJsonInputChange={handleJsonInputChange}
+            onApplySettings={applyJsonSettings}
+            onCopySettings={copyCurrentSettings}
+          />
+
+          <CurrentSettingsDisplay settings={exportSettingsObj} hasSettings={hasExportSettings} />
+        </Box>
       </div>
-    </div>
+    </ThemeProvider>
   )
 }
 
