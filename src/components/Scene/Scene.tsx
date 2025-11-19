@@ -21,12 +21,10 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
   const isDragging = useRef(false)
   const previousMouse = useRef({ x: 0, y: 0 })
 
-  // Set camera when scene data changes
   useEffect(() => {
     if (sceneData?.activeCamera) {
       const activeCamera = sceneData.activeCamera
 
-      // Copy position and rotation
       camera.position.copy(activeCamera.position)
       camera.rotation.copy(activeCamera.rotation)
 
@@ -41,7 +39,6 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
     }
   }, [sceneData?.activeCamera, camera])
 
-  // Mouse interaction handlers
   useEffect(() => {
     const canvas = gl.domElement
 
@@ -59,11 +56,9 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
 
       previousMouse.current = { x: e.clientX, y: e.clientY }
 
-      // Rotation speed multipliers
       const rotationSpeedX = 0.005
       const rotationSpeedY = 0.005
 
-      // Update rotation based on mouse delta (inverted for natural feel)
       const newRotationX = currentRotationX.current - deltaY * rotationSpeedX
       const newRotationY = currentRotationY.current + deltaX * rotationSpeedY
 

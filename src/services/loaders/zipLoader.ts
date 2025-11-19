@@ -8,11 +8,9 @@ export const loadZip = async (arrayBuffer: ArrayBuffer): Promise<Object3D> => {
   const zip = new JSZip()
   const loadedZip = await zip.loadAsync(arrayBuffer)
 
-  // Find the first 3D file in the ZIP
   const fileEntries = Object.entries(loadedZip.files)
 
   for (const [filename, zipEntry] of fileEntries) {
-    // Skip directories and system files
     if (zipEntry.dir || filename.includes('__MACOSX') || filename.startsWith('.')) {
       continue
     }

@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Documentation (for context)
+CHANGELOG.md
+ARCHITECTURE.md

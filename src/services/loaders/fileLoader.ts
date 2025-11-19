@@ -11,7 +11,6 @@ export const loadFileByExtension = async (
   const fileName = file.name.toLowerCase()
   console.log(`Processing file: ${file.name} (${file.size} bytes, type: ${file.type})`)
 
-  // Check for ZIP magic bytes first (more reliable than extension)
   if (isZipFile(arrayBuffer)) {
     console.log(
       `Detected ZIP file by magic bytes: ${Array.from(new Uint8Array(arrayBuffer).slice(0, 4))
@@ -21,7 +20,6 @@ export const loadFileByExtension = async (
     return await loadZip(arrayBuffer)
   }
 
-  // Fall back to extension-based detection
   if (fileName.endsWith('.zip')) {
     return await loadZip(arrayBuffer)
   }

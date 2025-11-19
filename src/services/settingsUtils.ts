@@ -5,8 +5,6 @@ export const applyOrbitControlsMapping = (
   parsed: Record<string, unknown>
 ): Partial<ModelControlsSettings> => {
   const updates: Partial<ModelControlsSettings> = {}
-
-  // Map OrbitControls properties to model controls
   if (typeof parsed.minPolarAngle === 'number') {
     updates.minRotationX = parsed.minPolarAngle
     updates.useRotationXConstraints = true
@@ -24,7 +22,6 @@ export const applyOrbitControlsMapping = (
     updates.useRotationYConstraints = true
   }
 
-  // Direct model control properties
   if (typeof parsed.rotationX === 'number') updates.rotationX = parsed.rotationX
   if (typeof parsed.rotationY === 'number') updates.rotationY = parsed.rotationY
   if (typeof parsed.scale === 'number') updates.scale = parsed.scale
@@ -32,7 +29,6 @@ export const applyOrbitControlsMapping = (
   if (typeof parsed.positionY === 'number') updates.positionY = parsed.positionY
   if (typeof parsed.positionZ === 'number') updates.positionZ = parsed.positionZ
 
-  // Rotation constraints
   if (typeof parsed.minRotationX === 'number') {
     updates.minRotationX = parsed.minRotationX
     updates.useRotationXConstraints = true
@@ -50,7 +46,6 @@ export const applyOrbitControlsMapping = (
     updates.useRotationYConstraints = true
   }
 
-  // Other settings
   if (typeof parsed.enableDamping === 'boolean') updates.enableDamping = parsed.enableDamping
   if (typeof parsed.dampingFactor === 'number') updates.dampingFactor = parsed.dampingFactor
   if (typeof parsed.autoRotate === 'boolean') updates.autoRotate = parsed.autoRotate
@@ -63,8 +58,6 @@ export const buildMinimalExportSettings = (
   settings: ModelControlsSettings
 ): Record<string, unknown> => {
   const exportSettings: Record<string, unknown> = {}
-
-  // Only include rotation/scale/position if they differ from defaults
   if (roundNumber(settings.rotationX) !== 0)
     exportSettings.rotationX = roundNumber(settings.rotationX)
   if (roundNumber(settings.rotationY) !== 0)
@@ -77,7 +70,6 @@ export const buildMinimalExportSettings = (
   if (roundNumber(settings.positionZ) !== 0)
     exportSettings.positionZ = roundNumber(settings.positionZ)
 
-  // Add constraints only if enabled
   if (settings.useRotationXConstraints) {
     exportSettings.minRotationX = roundNumber(settings.minRotationX)
     exportSettings.maxRotationX = roundNumber(settings.maxRotationX)
@@ -93,7 +85,6 @@ export const buildMinimalExportSettings = (
         : roundNumber(settings.maxRotationY)
   }
 
-  // Only include damping if enabled
   if (settings.enableDamping) {
     exportSettings.enableDamping = true
     if (roundNumber(settings.dampingFactor) !== 0.05) {
@@ -101,7 +92,6 @@ export const buildMinimalExportSettings = (
     }
   }
 
-  // Only include auto-rotate if enabled
   if (settings.autoRotate) {
     exportSettings.autoRotate = true
     if (roundNumber(settings.autoRotateSpeed) !== 2) {

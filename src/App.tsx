@@ -34,7 +34,6 @@ function App() {
   const [jsonInput, setJsonInput] = useState('')
   const [jsonError, setJsonError] = useState('')
 
-  // Calculate current values for display
   const currentValues: CurrentValues = useMemo(
     () => ({
       rotationX: settings.rotationX,
@@ -44,14 +43,12 @@ function App() {
     [settings.rotationX, settings.rotationY, settings.scale]
   )
 
-  // Export settings
   const exportSettingsObj = useMemo(() => getExportSettings(), [getExportSettings])
   const hasExportSettings = useMemo(
     () => Object.keys(exportSettingsObj).length > 0,
     [exportSettingsObj]
   )
 
-  // Handle file drop
   const handleDrop = useCallback(
     async (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault()
@@ -81,7 +78,6 @@ function App() {
     e.stopPropagation()
   }, [])
 
-  // Handle JSON settings import
   const handleJsonInputChange = useCallback((value: string) => {
     setJsonInput(value)
     setJsonError('')
@@ -102,7 +98,6 @@ function App() {
     }
   }, [jsonInput, applyJsonSettings])
 
-  // Handle copy current settings
   const handleCopySettings = useCallback(() => {
     if (!hasExportSettings) {
       setJsonError('No settings to copy (all values are at defaults)')
@@ -123,7 +118,6 @@ function App() {
       })
   }, [exportSettingsObj, hasExportSettings])
 
-  // Handle controls update from Scene (called during user interaction)
   const handleControlsUpdate = useCallback(
     (rotationX: number, rotationY: number, scale: number) => {
       updateSetting('rotationX', rotationX)
@@ -133,7 +127,6 @@ function App() {
     [updateSetting]
   )
 
-  // Handle interactive change from Scene (same as handleControlsUpdate for now)
   const handleInteractiveChange = useCallback(
     (rotationX: number, rotationY: number, scale: number) => {
       updateSetting('rotationX', rotationX)

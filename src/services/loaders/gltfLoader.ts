@@ -18,12 +18,10 @@ export const loadGltf = (arrayBuffer: ArrayBuffer): Promise<Object3D> => {
     try {
       const loader = new GLTFLoader()
 
-      // Set up Draco decoder for compressed models
       const dracoLoader = new DRACOLoader()
       dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
       loader.setDRACOLoader(dracoLoader)
 
-      // Set up KTX2 decoder for compressed textures
       const ktx2Loader = new KTX2Loader()
       ktx2Loader.setTranscoderPath('https://unpkg.com/three@0.181.1/examples/jsm/libs/basis/')
       const canvas = document.createElement('canvas')
