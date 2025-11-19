@@ -53,11 +53,20 @@ Enable constraints using the checkboxes to include them in the export.
 ## Development
 
 ```bash
-npm run dev          # Start dev server
-npm run build        # Build for production
-npm run format       # Format code with Biome
-npm run check        # Run linter
+npm run dev            # Start dev server
+npm run build          # Build for production (auto-copies decoders)
+npm run copy-decoders  # Manually copy decoder files from Three.js
+npm run format         # Format code with Biome
+npm run check          # Run linter
 ```
+
+### Decoder Files
+
+The app uses local Draco and KTX2 decoder files instead of CDN links. These are automatically copied from your installed Three.js version to `public/libs/` when you:
+- Run `npm install` (via postinstall hook)
+- Run `npm run build` (via prebuild hook)
+
+After updating Three.js, the decoders will automatically sync to match your version.
 
 ## Tech Stack
 

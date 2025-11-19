@@ -19,11 +19,11 @@ export const loadGltf = (arrayBuffer: ArrayBuffer): Promise<Object3D> => {
       const loader = new GLTFLoader()
 
       const dracoLoader = new DRACOLoader()
-      dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/')
+      dracoLoader.setDecoderPath('/libs/draco/')
       loader.setDRACOLoader(dracoLoader)
 
       const ktx2Loader = new KTX2Loader()
-      ktx2Loader.setTranscoderPath('https://unpkg.com/three@0.181.1/examples/jsm/libs/basis/')
+      ktx2Loader.setTranscoderPath('/libs/basis/')
       const canvas = document.createElement('canvas')
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
       if (gl) {

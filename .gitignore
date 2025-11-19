@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Generated decoder files (copied from node_modules)
+public/libs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

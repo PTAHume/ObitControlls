@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "prebuild": "npm run copy-decoders",
+    "postinstall": "npm run copy-decoders",
+    "copy-decoders": "node scripts/copy-decoders.js",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check --write .",
