@@ -21,7 +21,7 @@ export function AutoRotateControl({
           label="Auto Rotate"
         />
         <Typography variant="caption" display="block" color="text.secondary">
-          Enables continuous turntable rotation
+          Enables continuous rotation
         </Typography>
       </Box>
 

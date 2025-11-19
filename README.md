@@ -38,7 +38,7 @@ npm run dev
 
 ## JSON Export
 
-The app exports minimal JSON with only non-default values:
+The app outputs minimal JSON with only non-default values:
 
 ```json
 {
@@ -62,13 +62,12 @@ npm run check          # Run linter
 
 ### Decoder Files
 
-The app uses local Draco and KTX2 decoder files instead of CDN links. These are automatically copied from your installed Three.js version to `public/libs/` when you:
+The app uses local Draco and KTX2 decoder files instead of CDN links. These are automatically copied from Three.js  to `public/libs/`:
 - Run `npm install` (via postinstall hook)
 - Run `npm run build` (via prebuild hook)
 
-After updating Three.js, the decoders will automatically sync to match your version.
 
-## Tech Stack
+## Project uses 
 
 - React + TypeScript
 - Three.js + React Three Fiber
@@ -82,7 +81,7 @@ If models don't load:
 - Check file format is supported
 - Ensure file isn't corrupted
 - Check browser console for errors
-- Try a different model
+- Try a different model 
 
 ## License
 

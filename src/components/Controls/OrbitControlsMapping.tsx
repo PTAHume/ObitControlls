@@ -9,8 +9,8 @@ export function OrbitControlsMapping() {
       </AccordionSummary>
       <AccordionDetails>
         <Typography variant="body2" paragraph>
-          This tool manipulates the <strong>model</strong> instead of the camera (inverse of
-          OrbitControls). Here's how they map:
+          This manipulates the <strong>model</strong> instead of the camera (inverse of
+          OrbitControls):
         </Typography>
         <Box component="table" sx={{ width: '100%', fontSize: '0.875rem' }}>
           <thead>

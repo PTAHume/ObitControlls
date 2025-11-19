@@ -137,7 +137,6 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       )
     }
     if (!settings.autoRotate && settings.useRotationYConstraints) {
-      // Preserve Infinity values for unlimited rotation
       const minY =
         settings.minRotationY === Number.NEGATIVE_INFINITY
           ? Number.NEGATIVE_INFINITY
