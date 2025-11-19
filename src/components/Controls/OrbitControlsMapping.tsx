@@ -59,7 +59,7 @@ export function OrbitControlsMapping() {
           display="block"
           sx={{ mt: 1, fontStyle: 'italic', color: 'text.secondary' }}
         >
-          💡 Tip: Scale is inverted - smaller scale = camera farther away, larger scale = camera
+          Note: Scale is inverted - smaller scale = camera farther away, larger scale = camera
           closer
         </Typography>
       </AccordionDetails>

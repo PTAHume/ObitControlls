@@ -51,7 +51,7 @@ function App() {
 
   const handleDrop = useCallback(
     async (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault()
+    e.preventDefault()
       e.stopPropagation()
 
       const droppedFiles = Array.from(e.dataTransfer.files)
@@ -64,11 +64,11 @@ function App() {
         setupScene(loadedScene)
         resetViewOnLoad()
         setJsonError('Model loaded successfully!')
-        setTimeout(() => setJsonError(''), 3000)
+            setTimeout(() => setJsonError(''), 3000)
       } else {
         setJsonError(loadError || 'Failed to load file')
-        setTimeout(() => setJsonError(''), 5000)
-      }
+          setTimeout(() => setJsonError(''), 5000)
+        }
     },
     [loadFile, setupScene, resetViewOnLoad, loadError]
   )
@@ -109,8 +109,8 @@ function App() {
     navigator.clipboard
       .writeText(jsonString)
       .then(() => {
-        setJsonError('Settings copied to clipboard!')
-        setTimeout(() => setJsonError(''), 3000)
+    setJsonError('Settings copied to clipboard!')
+    setTimeout(() => setJsonError(''), 3000)
       })
       .catch(() => {
         setJsonError('Failed to copy to clipboard')
@@ -145,15 +145,15 @@ function App() {
           onDragOver={handleDragOver}
         >
           <Canvas>
-            <Scene
-              sceneData={sceneData}
-              settings={settings}
-              onControlsUpdate={handleControlsUpdate}
+          <Scene
+            sceneData={sceneData}
+            settings={settings}
+            onControlsUpdate={handleControlsUpdate}
               onInteractiveChange={handleInteractiveChange}
-            />
-          </Canvas>
-          {!sceneData && (
-            <div className="drop-zone">
+          />
+        </Canvas>
+        {!sceneData && (
+          <div className="drop-zone">
               <p>Drag and drop your 3D model here</p>
               <ul className="file-types">
                 <li>Three.js Scene (.json)</li>
@@ -173,9 +173,9 @@ function App() {
           {isLoading && (
             <div className="loading-overlay">
               <p>Loading model...</p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
         <Box
           sx={{
@@ -209,7 +209,7 @@ function App() {
 
           <RotationControl
             axis="X"
-            value={settings.rotationX}
+              value={settings.rotationX}
             minValue={settings.minRotationX}
             maxValue={settings.maxRotationX}
             useConstraints={settings.useRotationXConstraints}
@@ -223,7 +223,7 @@ function App() {
 
           <RotationControl
             axis="Y"
-            value={settings.rotationY}
+              value={settings.rotationY}
             minValue={settings.minRotationY}
             maxValue={settings.maxRotationY}
             useConstraints={settings.useRotationYConstraints}
@@ -233,7 +233,7 @@ function App() {
             sliderMax={
               settings.maxRotationY === Number.POSITIVE_INFINITY ? Math.PI : settings.maxRotationY
             }
-            disabled={settings.autoRotate}
+              disabled={settings.autoRotate}
             onValueChange={value => updateSetting('rotationY', value)}
             onMinChange={value => updateSetting('minRotationY', value)}
             onMaxChange={value => updateSetting('maxRotationY', value)}
@@ -249,21 +249,21 @@ function App() {
             onPositionXChange={value => updateSetting('positionX', value)}
             onPositionYChange={value => updateSetting('positionY', value)}
             onPositionZChange={value => updateSetting('positionZ', value)}
-          />
+            />
 
           <DampingControl
             enabled={settings.enableDamping}
             factor={settings.dampingFactor}
             onEnabledChange={enabled => updateSetting('enableDamping', enabled)}
             onFactorChange={factor => updateSetting('dampingFactor', factor)}
-          />
+              />
 
           <AutoRotateControl
             enabled={settings.autoRotate}
             speed={settings.autoRotateSpeed}
             onEnabledChange={enabled => updateSetting('autoRotate', enabled)}
             onSpeedChange={speed => updateSetting('autoRotateSpeed', speed)}
-          />
+            />
 
           <Divider sx={{ my: 3 }} />
 
@@ -273,11 +273,11 @@ function App() {
             onJsonInputChange={handleJsonInputChange}
             onApplySettings={handleApplySettings}
             onCopySettings={handleCopySettings}
-          />
+              />
 
           <CurrentSettingsDisplay settings={exportSettingsObj} hasSettings={hasExportSettings} />
         </Box>
-      </div>
+            </div>
     </ThemeProvider>
   )
 }

@@ -28,7 +28,6 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       camera.position.copy(activeCamera.position)
       camera.rotation.copy(activeCamera.rotation)
 
-      // Handle perspective camera properties
       if (activeCamera instanceof PerspectiveCamera && camera instanceof PerspectiveCamera) {
         camera.fov = activeCamera.fov
         camera.near = activeCamera.near
@@ -62,13 +61,13 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       const newRotationX = currentRotationX.current - deltaY * rotationSpeedX
       const newRotationY = currentRotationY.current + deltaX * rotationSpeedY
 
-      // Apply constraints only if enabled
       const constrainedX = settings.useRotationXConstraints
         ? Math.max(settings.minRotationX, Math.min(settings.maxRotationX, newRotationX))
         : newRotationX
 
       let constrainedY = newRotationY
       if (settings.useRotationYConstraints) {
+        // Preserve Infinity values for unlimited rotation
         const minY =
           settings.minRotationY === Number.NEGATIVE_INFINITY
             ? Number.NEGATIVE_INFINITY
@@ -80,11 +79,8 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
         constrainedY = Math.max(minY, Math.min(maxY, newRotationY))
       }
 
-      // Update the actual rotation values
       currentRotationX.current = constrainedX
       currentRotationY.current = constrainedY
-
-      // Update the settings so sliders reflect the change
       onInteractiveChange(constrainedX, constrainedY, currentScale.current)
     }
 
@@ -96,16 +92,11 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
 
-      // Zoom speed multiplier
       const zoomSpeed = 0.001
       const newScale = currentScale.current - e.deltaY * zoomSpeed
-
-      // Always enforce minimum 0.01 to prevent zero/negative scale
       const constrainedScale = Math.max(0.01, newScale)
 
       currentScale.current = constrainedScale
-
-      // Update the settings so slider reflects the change
       onInteractiveChange(currentRotationX.current, currentRotationY.current, constrainedScale)
     }
 
@@ -127,22 +118,18 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
     }
   }, [gl, settings, onInteractiveChange])
 
-  // Apply model transformations
   useFrame((_state, delta) => {
     const group = modelGroupRef.current
     if (!group) return
 
-    // Auto-rotate if enabled
     if (settings.autoRotate) {
       currentRotationY.current += settings.autoRotateSpeed * delta
     } else {
-      // Manual control from settings when not auto-rotating
       currentRotationX.current = settings.rotationX
       currentRotationY.current = settings.autoRotate ? currentRotationY.current : settings.rotationY
       currentScale.current = settings.scale
     }
 
-    // Apply constraints only if enabled (skip Y constraints if auto-rotating)
     if (settings.useRotationXConstraints) {
       currentRotationX.current = Math.max(
         settings.minRotationX,
@@ -150,7 +137,7 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       )
     }
     if (!settings.autoRotate && settings.useRotationYConstraints) {
-      // Handle Infinity constraints properly
+      // Preserve Infinity values for unlimited rotation
       const minY =
         settings.minRotationY === Number.NEGATIVE_INFINITY
           ? Number.NEGATIVE_INFINITY
@@ -161,18 +148,16 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
           : settings.maxRotationY
       currentRotationY.current = Math.max(minY, Math.min(maxY, currentRotationY.current))
     }
-    // Always enforce minimum 0.01 to prevent zero/negative scale
+    
     currentScale.current = Math.max(0.01, currentScale.current)
 
-    // Apply transformations
     group.rotation.x = currentRotationX.current
     group.rotation.y = currentRotationY.current
     group.scale.setScalar(currentScale.current)
     group.position.set(settings.positionX, settings.positionY, settings.positionZ)
 
-    // Apply damping if enabled
+    // Smooth interpolation towards target values
     if (settings.enableDamping && !settings.autoRotate) {
-      // Smoothly interpolate towards target values
       const dampingAmount = 1 - settings.dampingFactor
 
       const targetX = settings.rotationX
@@ -184,7 +169,6 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       currentScale.current += (targetScale - currentScale.current) * dampingAmount
     }
 
-    // Notify parent of current values
     onControlsUpdate(currentRotationX.current, currentRotationY.current, currentScale.current)
   })
 
