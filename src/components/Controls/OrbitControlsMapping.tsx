@@ -48,10 +48,6 @@ export function OrbitControlsMapping() {
               <td style={{ padding: '0.5rem' }}>minDistance/maxDistance</td>
               <td style={{ padding: '0.5rem' }}>Use Scale slider</td>
             </tr>
-            <tr>
-              <td style={{ padding: '0.5rem' }}>enablePan</td>
-              <td style={{ padding: '0.5rem' }}>Not needed (camera fixed)</td>
-            </tr>
           </tbody>
         </Box>
         <Typography
