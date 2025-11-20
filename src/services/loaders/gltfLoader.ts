@@ -13,36 +13,45 @@ export const isZipFile = (arrayBuffer: ArrayBuffer): boolean => {
   )
 }
 
+let dracoLoaderInstance: DRACOLoader | null = null
+let ktx2LoaderInstance: KTX2Loader | null = null
+
+const getDracoLoader = (): DRACOLoader => {
+  if (!dracoLoaderInstance) {
+    dracoLoaderInstance = new DRACOLoader()
+    dracoLoaderInstance.setDecoderPath('/libs/draco/')
+  }
+  return dracoLoaderInstance
+}
+
+const getKTX2Loader = (): KTX2Loader => {
+  if (!ktx2LoaderInstance) {
+    ktx2LoaderInstance = new KTX2Loader()
+    ktx2LoaderInstance.setTranscoderPath('/libs/basis/')
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
+    if (gl) {
+      ktx2LoaderInstance.detectSupport({ getContext: () => gl } as unknown as WebGLRenderer)
+    }
+  }
+  return ktx2LoaderInstance
+}
+
 export const loadGltf = (arrayBuffer: ArrayBuffer): Promise<Object3D> => {
   return new Promise((resolve, reject) => {
     try {
       const loader = new GLTFLoader()
-
-      const dracoLoader = new DRACOLoader()
-      dracoLoader.setDecoderPath('/libs/draco/')
-      loader.setDRACOLoader(dracoLoader)
-
-      const ktx2Loader = new KTX2Loader()
-      ktx2Loader.setTranscoderPath('/libs/basis/')
-      const canvas = document.createElement('canvas')
-      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
-      if (gl) {
-        ktx2Loader.detectSupport({ getContext: () => gl } as unknown as WebGLRenderer)
-      }
-      loader.setKTX2Loader(ktx2Loader)
+      loader.setDRACOLoader(getDracoLoader())
+      loader.setKTX2Loader(getKTX2Loader())
 
       loader.parse(
         arrayBuffer,
         '',
         gltf => {
           console.log('GLTF loaded:', gltf)
-          dracoLoader.dispose()
-          ktx2Loader.dispose()
           resolve(gltf.scene)
         },
         error => {
-          dracoLoader.dispose()
-          ktx2Loader.dispose()
           reject(error)
         }
       )
@@ -50,4 +59,15 @@ export const loadGltf = (arrayBuffer: ArrayBuffer): Promise<Object3D> => {
       reject(error)
     }
   })
+}
+
+export const disposeLoaders = () => {
+  if (dracoLoaderInstance) {
+    dracoLoaderInstance.dispose()
+    dracoLoaderInstance = null
+  }
+  if (ktx2LoaderInstance) {
+    ktx2LoaderInstance.dispose()
+    ktx2LoaderInstance = null
+  }
 }

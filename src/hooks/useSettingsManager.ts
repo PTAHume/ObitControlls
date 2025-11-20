@@ -21,8 +21,10 @@ const DEFAULT_SETTINGS: ModelControlsSettings = {
   useRotationYConstraints: false,
 }
 
-export const useSettingsManager = () => {
-  const [settings, setSettings] = useState<ModelControlsSettings>(DEFAULT_SETTINGS)
+export const useSettingsManager = (initialSettings?: ModelControlsSettings) => {
+  const [settings, setSettings] = useState<ModelControlsSettings>(
+    initialSettings || DEFAULT_SETTINGS
+  )
 
   const updateSetting = useCallback(
     <K extends keyof ModelControlsSettings>(key: K, value: ModelControlsSettings[K]) => {

@@ -42,9 +42,9 @@ export function PositionControl({
           <Slider
             value={positionX}
             onChange={(_e, newValue) => onPositionXChange(newValue as number)}
-            min={-100}
-            max={100}
-            step={0.5}
+            min={-10}
+            max={10}
+            step={0.1}
             valueLabelDisplay="auto"
           />
         </Box>
@@ -55,9 +55,9 @@ export function PositionControl({
           <Slider
             value={positionY}
             onChange={(_e, newValue) => onPositionYChange(newValue as number)}
-            min={-100}
-            max={100}
-            step={0.5}
+            min={-10}
+            max={10}
+            step={0.1}
             valueLabelDisplay="auto"
           />
         </Box>
@@ -68,9 +68,9 @@ export function PositionControl({
           <Slider
             value={positionZ}
             onChange={(_e, newValue) => onPositionZChange(newValue as number)}
-            min={-100}
-            max={100}
-            step={0.5}
+            min={-10}
+            max={10}
+            step={0.1}
             valueLabelDisplay="auto"
           />
         </Box>
