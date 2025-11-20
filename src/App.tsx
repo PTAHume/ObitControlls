@@ -53,11 +53,7 @@ function App() {
   const [enableAxisLock, setEnableAxisLock] = useState(() => loadAxisLockSetting())
   const [enableAutoSave, setEnableAutoSave] = useState(true)
 
-  useSettingsStorage(settings, enableAutoSave, loadedSettings => {
-    for (const [key, value] of Object.entries(loadedSettings)) {
-      updateSetting(key as keyof typeof loadedSettings, value)
-    }
-  })
+  useSettingsStorage(settings, enableAutoSave)
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
