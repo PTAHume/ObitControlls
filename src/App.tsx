@@ -1,6 +1,6 @@
-import { Box, Divider, ThemeProvider, Typography } from '@mui/material'
+import { Box, Divider, FormControlLabel, Switch, ThemeProvider, Typography } from '@mui/material'
 import { Canvas } from '@react-three/fiber'
-import { useCallback, useMemo, useState } from 'react'
+import { type DragEvent, useCallback, useMemo, useState } from 'react'
 import './App.css'
 import {
   AutoRotateControl,
@@ -24,6 +24,7 @@ function App() {
   const {
     settings,
     updateSetting,
+    updateMultipleSettings,
     applyJsonSettings,
     getExportSettings,
     resetSettings,
@@ -33,6 +34,7 @@ function App() {
 
   const [jsonInput, setJsonInput] = useState('')
   const [jsonError, setJsonError] = useState('')
+  const [enableAxisLock, setEnableAxisLock] = useState(true)
 
   const currentValues: CurrentValues = useMemo(
     () => ({
@@ -50,8 +52,8 @@ function App() {
   )
 
   const handleDrop = useCallback(
-    async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
+    async (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault()
       e.stopPropagation()
 
       const droppedFiles = Array.from(e.dataTransfer.files)
@@ -64,16 +66,16 @@ function App() {
         setupScene(loadedScene)
         resetViewOnLoad()
         setJsonError('Model loaded successfully!')
-            setTimeout(() => setJsonError(''), 3000)
+        setTimeout(() => setJsonError(''), 3000)
       } else {
         setJsonError(loadError || 'Failed to load file')
-          setTimeout(() => setJsonError(''), 5000)
-        }
+        setTimeout(() => setJsonError(''), 5000)
+      }
     },
     [loadFile, setupScene, resetViewOnLoad, loadError]
   )
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
   }, [])
@@ -109,8 +111,8 @@ function App() {
     navigator.clipboard
       .writeText(jsonString)
       .then(() => {
-    setJsonError('Settings copied to clipboard!')
-    setTimeout(() => setJsonError(''), 3000)
+        setJsonError('Settings copied to clipboard!')
+        setTimeout(() => setJsonError(''), 3000)
       })
       .catch(() => {
         setJsonError('Failed to copy to clipboard')
@@ -120,40 +122,33 @@ function App() {
 
   const handleControlsUpdate = useCallback(
     (rotationX: number, rotationY: number, scale: number) => {
-      updateSetting('rotationX', rotationX)
-      updateSetting('rotationY', rotationY)
-      updateSetting('scale', scale)
+      updateMultipleSettings({ rotationX, rotationY, scale })
     },
-    [updateSetting]
+    [updateMultipleSettings]
   )
 
   const handleInteractiveChange = useCallback(
     (rotationX: number, rotationY: number, scale: number) => {
-      updateSetting('rotationX', rotationX)
-      updateSetting('rotationY', rotationY)
-      updateSetting('scale', scale)
+      updateMultipleSettings({ rotationX, rotationY, scale })
     },
-    [updateSetting]
+    [updateMultipleSettings]
   )
 
   return (
     <ThemeProvider theme={darkTheme}>
       <div className="app-container">
-        <div
-          className="canvas-container"
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-        >
+        <div className="canvas-container" onDrop={handleDrop} onDragOver={handleDragOver}>
           <Canvas>
-          <Scene
-            sceneData={sceneData}
-            settings={settings}
-            onControlsUpdate={handleControlsUpdate}
+            <Scene
+              sceneData={sceneData}
+              settings={settings}
+              enableAxisLock={enableAxisLock}
+              onControlsUpdate={handleControlsUpdate}
               onInteractiveChange={handleInteractiveChange}
-          />
-        </Canvas>
-        {!sceneData && (
-          <div className="drop-zone">
+            />
+          </Canvas>
+          {!sceneData && (
+            <div className="drop-zone">
               <p>Drag and drop your 3D model here</p>
               <ul className="file-types">
                 <li>Three.js Scene (.json)</li>
@@ -166,16 +161,17 @@ function App() {
           {sceneData && (
             <div className="interaction-hint">
               <p>
-                🖱️ <strong>Drag</strong> to rotate • <strong>Scroll</strong> to zoom
+                🖱️ <strong>Drag left/right</strong> to spin • <strong>Drag up/down</strong> to tilt •{' '}
+                <strong>Scroll</strong> to zoom
               </p>
             </div>
           )}
           {isLoading && (
             <div className="loading-overlay">
               <p>Loading model...</p>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
 
         <Box
           sx={{
@@ -205,11 +201,27 @@ function App() {
 
           {sceneData && <CameraSelector sceneData={sceneData} onCameraChange={changeCamera} />}
 
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={enableAxisLock}
+                  onChange={e => setEnableAxisLock(e.target.checked)}
+                />
+              }
+              label="Lock Drag to Single Axis"
+            />
+            <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+              When enabled, dragging locks to horizontal or vertical rotation based on initial
+              movement direction
+            </Typography>
+          </Box>
+
           <OrbitControlsMapping />
 
           <RotationControl
             axis="X"
-              value={settings.rotationX}
+            value={settings.rotationX}
             minValue={settings.minRotationX}
             maxValue={settings.maxRotationX}
             useConstraints={settings.useRotationXConstraints}
@@ -223,7 +235,7 @@ function App() {
 
           <RotationControl
             axis="Y"
-              value={settings.rotationY}
+            value={settings.rotationY}
             minValue={settings.minRotationY}
             maxValue={settings.maxRotationY}
             useConstraints={settings.useRotationYConstraints}
@@ -233,7 +245,7 @@ function App() {
             sliderMax={
               settings.maxRotationY === Number.POSITIVE_INFINITY ? Math.PI : settings.maxRotationY
             }
-              disabled={settings.autoRotate}
+            disabled={settings.autoRotate}
             onValueChange={value => updateSetting('rotationY', value)}
             onMinChange={value => updateSetting('minRotationY', value)}
             onMaxChange={value => updateSetting('maxRotationY', value)}
@@ -249,21 +261,21 @@ function App() {
             onPositionXChange={value => updateSetting('positionX', value)}
             onPositionYChange={value => updateSetting('positionY', value)}
             onPositionZChange={value => updateSetting('positionZ', value)}
-            />
+          />
 
           <DampingControl
             enabled={settings.enableDamping}
             factor={settings.dampingFactor}
             onEnabledChange={enabled => updateSetting('enableDamping', enabled)}
             onFactorChange={factor => updateSetting('dampingFactor', factor)}
-              />
+          />
 
           <AutoRotateControl
             enabled={settings.autoRotate}
             speed={settings.autoRotateSpeed}
             onEnabledChange={enabled => updateSetting('autoRotate', enabled)}
             onSpeedChange={speed => updateSetting('autoRotateSpeed', speed)}
-            />
+          />
 
           <Divider sx={{ my: 3 }} />
 
@@ -273,11 +285,11 @@ function App() {
             onJsonInputChange={handleJsonInputChange}
             onApplySettings={handleApplySettings}
             onCopySettings={handleCopySettings}
-              />
+          />
 
           <CurrentSettingsDisplay settings={exportSettingsObj} hasSettings={hasExportSettings} />
         </Box>
-            </div>
+      </div>
     </ThemeProvider>
   )
 }

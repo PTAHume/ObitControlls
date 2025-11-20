@@ -18,11 +18,10 @@ export const useSceneSetup = () => {
 
   const changeCamera = useCallback((cameraIndex: number) => {
     setSceneData(prev => {
-      if (!prev || !prev.cameras[cameraIndex]) return prev
+      if (!prev?.cameras[cameraIndex]) return prev
       return { ...prev, activeCamera: prev.cameras[cameraIndex] }
     })
   }, [])
 
   return { sceneData, setupScene, clearScene, changeCamera }
 }
-

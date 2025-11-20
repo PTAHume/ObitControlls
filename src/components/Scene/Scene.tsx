@@ -8,11 +8,18 @@ import { SceneModel } from './SceneModel'
 interface SceneProps {
   sceneData: SceneData | null
   settings: ModelControlsSettings
+  enableAxisLock: boolean
   onControlsUpdate: (rotationX: number, rotationY: number, scale: number) => void
   onInteractiveChange: (rotationX: number, rotationY: number, scale: number) => void
 }
 
-export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChange }: SceneProps) {
+export function Scene({
+  sceneData,
+  settings,
+  enableAxisLock,
+  onControlsUpdate,
+  onInteractiveChange,
+}: SceneProps) {
   const modelGroupRef = useRef<Group>(null)
   const { camera, gl } = useThree()
   const currentRotationX = useRef(0)
@@ -20,6 +27,8 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
   const currentScale = useRef(1)
   const isDragging = useRef(false)
   const previousMouse = useRef({ x: 0, y: 0 })
+  const dragAxis = useRef<'x' | 'y' | null>(null)
+  const dragStartPos = useRef({ x: 0, y: 0 })
 
   useEffect(() => {
     if (sceneData?.activeCamera) {
@@ -44,6 +53,8 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
     const handleMouseDown = (e: MouseEvent) => {
       isDragging.current = true
       previousMouse.current = { x: e.clientX, y: e.clientY }
+      dragStartPos.current = { x: e.clientX, y: e.clientY }
+      dragAxis.current = null
       canvas.style.cursor = 'grabbing'
     }
 
@@ -53,13 +64,29 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       const deltaX = e.clientX - previousMouse.current.x
       const deltaY = e.clientY - previousMouse.current.y
 
+      if (enableAxisLock && dragAxis.current === null) {
+        const totalDeltaX = Math.abs(e.clientX - dragStartPos.current.x)
+        const totalDeltaY = Math.abs(e.clientY - dragStartPos.current.y)
+
+        if (totalDeltaX > 5 || totalDeltaY > 5) {
+          dragAxis.current = totalDeltaX > totalDeltaY ? 'y' : 'x'
+        }
+      }
+
       previousMouse.current = { x: e.clientX, y: e.clientY }
 
       const rotationSpeedX = 0.005
       const rotationSpeedY = 0.005
 
-      const newRotationX = currentRotationX.current - deltaY * rotationSpeedX
-      const newRotationY = currentRotationY.current + deltaX * rotationSpeedY
+      let newRotationX = currentRotationX.current
+      let newRotationY = currentRotationY.current
+
+      if (!enableAxisLock || dragAxis.current === 'x' || dragAxis.current === null) {
+        newRotationX = currentRotationX.current - deltaY * rotationSpeedX
+      }
+      if (!enableAxisLock || dragAxis.current === 'y' || dragAxis.current === null) {
+        newRotationY = currentRotationY.current + deltaX * rotationSpeedY
+      }
 
       const constrainedX = settings.useRotationXConstraints
         ? Math.max(settings.minRotationX, Math.min(settings.maxRotationX, newRotationX))
@@ -81,11 +108,18 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
 
       currentRotationX.current = constrainedX
       currentRotationY.current = constrainedY
-      onInteractiveChange(constrainedX, constrainedY, currentScale.current)
     }
 
     const handleMouseUp = () => {
+      if (isDragging.current) {
+        onInteractiveChange(
+          currentRotationX.current,
+          currentRotationY.current,
+          currentScale.current
+        )
+      }
       isDragging.current = false
+      dragAxis.current = null
       canvas.style.cursor = 'grab'
     }
 
@@ -97,7 +131,7 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       const constrainedScale = Math.max(0.01, newScale)
 
       currentScale.current = constrainedScale
-      onInteractiveChange(currentRotationX.current, currentRotationY.current, constrainedScale)
+      onInteractiveChange(currentRotationX.current, currentRotationY.current, currentScale.current)
     }
 
     canvas.addEventListener('mousedown', handleMouseDown)
@@ -116,7 +150,7 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       canvas.removeEventListener('wheel', handleWheel)
       canvas.style.cursor = 'default'
     }
-  }, [gl, settings, onInteractiveChange])
+  }, [gl, settings, enableAxisLock, onInteractiveChange])
 
   useFrame((_state, delta) => {
     const group = modelGroupRef.current
@@ -124,9 +158,10 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
 
     if (settings.autoRotate) {
       currentRotationY.current += settings.autoRotateSpeed * delta
-    } else {
+      onControlsUpdate(currentRotationX.current, currentRotationY.current, currentScale.current)
+    } else if (!isDragging.current) {
       currentRotationX.current = settings.rotationX
-      currentRotationY.current = settings.autoRotate ? currentRotationY.current : settings.rotationY
+      currentRotationY.current = settings.rotationY
       currentScale.current = settings.scale
     }
 
@@ -147,16 +182,10 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
           : settings.maxRotationY
       currentRotationY.current = Math.max(minY, Math.min(maxY, currentRotationY.current))
     }
-    
+
     currentScale.current = Math.max(0.01, currentScale.current)
 
-    group.rotation.x = currentRotationX.current
-    group.rotation.y = currentRotationY.current
-    group.scale.setScalar(currentScale.current)
-    group.position.set(settings.positionX, settings.positionY, settings.positionZ)
-
-    // Smooth interpolation towards target values
-    if (settings.enableDamping && !settings.autoRotate) {
+    if (settings.enableDamping && !settings.autoRotate && !isDragging.current) {
       const dampingAmount = 1 - settings.dampingFactor
 
       const targetX = settings.rotationX
@@ -168,7 +197,10 @@ export function Scene({ sceneData, settings, onControlsUpdate, onInteractiveChan
       currentScale.current += (targetScale - currentScale.current) * dampingAmount
     }
 
-    onControlsUpdate(currentRotationX.current, currentRotationY.current, currentScale.current)
+    group.rotation.x = currentRotationX.current
+    group.rotation.y = currentRotationY.current
+    group.scale.setScalar(currentScale.current)
+    group.position.set(settings.positionX, settings.positionY, settings.positionZ)
   })
 
   return (

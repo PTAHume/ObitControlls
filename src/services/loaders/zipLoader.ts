@@ -1,5 +1,5 @@
 import JSZip from 'jszip'
-import { type Object3D } from 'three'
+import type { Object3D } from 'three'
 import { loadGltf } from './gltfLoader'
 import { loadObj } from './objLoader'
 import { loadJsonScene } from './sceneLoader'
@@ -44,4 +44,3 @@ export const loadZip = async (arrayBuffer: ArrayBuffer): Promise<Object3D> => {
 
   throw new Error('No supported 3D file found in ZIP (.json, .gltf, .glb, .obj)')
 }
-

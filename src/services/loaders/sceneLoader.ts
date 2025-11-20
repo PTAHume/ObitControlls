@@ -1,4 +1,4 @@
-import { ObjectLoader, type Object3D } from 'three'
+import { type Object3D, ObjectLoader } from 'three'
 
 export const loadJsonScene = (data: string): Promise<Object3D> => {
   return new Promise((resolve, reject) => {
@@ -14,4 +14,3 @@ export const loadJsonScene = (data: string): Promise<Object3D> => {
     }
   })
 }
-

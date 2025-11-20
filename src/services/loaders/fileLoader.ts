@@ -1,4 +1,4 @@
-import { type Object3D } from 'three'
+import type { Object3D } from 'three'
 import { isZipFile, loadGltf } from './gltfLoader'
 import { loadObj } from './objLoader'
 import { loadJsonScene } from './sceneLoader'
@@ -45,4 +45,3 @@ export const loadFileByExtension = async (
     `Unsupported file type: ${file.name}. Please use .json, .gltf, .glb, .obj, or .zip`
   )
 }
-

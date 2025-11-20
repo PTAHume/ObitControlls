@@ -101,4 +101,3 @@ export const buildMinimalExportSettings = (
 
   return exportSettings
 }
-

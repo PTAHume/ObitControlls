@@ -31,16 +31,23 @@ export const useSettingsManager = () => {
     []
   )
 
-  const applyJsonSettings = useCallback((jsonString: string): { success: boolean; error?: string } => {
-    try {
-      const parsed = JSON.parse(jsonString)
-      const updates = applyOrbitControlsMapping(parsed)
-      setSettings(prev => ({ ...prev, ...updates }))
-      return { success: true }
-    } catch (_error) {
-      return { success: false, error: 'Invalid JSON format. Please check your input.' }
-    }
+  const updateMultipleSettings = useCallback((updates: Partial<ModelControlsSettings>) => {
+    setSettings(prev => ({ ...prev, ...updates }))
   }, [])
+
+  const applyJsonSettings = useCallback(
+    (jsonString: string): { success: boolean; error?: string } => {
+      try {
+        const parsed = JSON.parse(jsonString)
+        const updates = applyOrbitControlsMapping(parsed)
+        setSettings(prev => ({ ...prev, ...updates }))
+        return { success: true }
+      } catch (_error) {
+        return { success: false, error: 'Invalid JSON format. Please check your input.' }
+      }
+    },
+    []
+  )
 
   const getExportSettings = useCallback(() => {
     return buildMinimalExportSettings(settings)
@@ -77,6 +84,7 @@ export const useSettingsManager = () => {
   return {
     settings,
     updateSetting,
+    updateMultipleSettings,
     applyJsonSettings,
     getExportSettings,
     resetSettings,
@@ -84,4 +92,3 @@ export const useSettingsManager = () => {
     resetViewOnLoad,
   }
 }
-

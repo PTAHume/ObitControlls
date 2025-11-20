@@ -29,4 +29,3 @@ export const useFileLoader = () => {
 
   return { loadFile, isLoading, error, clearError }
 }
-

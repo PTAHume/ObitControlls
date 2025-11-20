@@ -55,4 +55,3 @@ export const setupSceneWithCamera = (loadedScene: Object3D): SceneData => {
 
   return { scene: loadedScene, cameras, activeCamera }
 }
-

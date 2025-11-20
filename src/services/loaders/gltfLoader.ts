@@ -1,4 +1,4 @@
-import { type Object3D, type WebGLRenderer } from 'three'
+import type { Object3D, WebGLRenderer } from 'three'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
@@ -51,4 +51,3 @@ export const loadGltf = (arrayBuffer: ArrayBuffer): Promise<Object3D> => {
     }
   })
 }
-

@@ -1,19 +1,19 @@
-import { copyFileSync, mkdirSync, readdirSync, statSync } from 'fs'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { copyFileSync, mkdirSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const projectRoot = join(__dirname, '..')
 
 function copyDirectory(src, dest) {
   mkdirSync(dest, { recursive: true })
-  
+
   const entries = readdirSync(src, { withFileTypes: true })
-  
+
   for (const entry of entries) {
     const srcPath = join(src, entry.name)
     const destPath = join(dest, entry.name)
-    
+
     if (entry.isDirectory()) {
       copyDirectory(srcPath, destPath)
     } else {
@@ -34,4 +34,3 @@ const basisDest = join(projectRoot, 'public/libs/basis')
 copyDirectory(basisSrc, basisDest)
 
 console.log('\n✅ Decoder files copied successfully!')
-
